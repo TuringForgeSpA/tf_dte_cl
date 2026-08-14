@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Registro del nuevo formato EDI para el SII de Chile.
+
+            IMPORTANTE: en el framework EDI de Odoo NO se crea un modelo nuevo
+            por cada formato. Todos los formatos (UBL, Factur-X, CFDI, este
+            DTE, etc.) son registros del MISMO modelo `account.edi.format`.
+            Lo que los distingue es el campo `code`: en account_edi_format.py
+            cada método hace un dispatch tipo
+
+                if self.code != 'sii_dte':
+                    return super()._metodo(...)
+
+            para solo actuar cuando el registro que se está ejecutando es
+            este. Por eso el `code` de abajo debe coincidir EXACTO con la
+            constante DTE_CODE usada en el modelo Python.
+        -->
+        <record id="edi_sii_dte" model="account.edi.format">
+            <field name="name">SII Chile - Documento Tributario Electrónico (DTE)</field>
+            <field name="code">sii_dte</field>
+        </record>
+
+    </data>
+</odoo>
