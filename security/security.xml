@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="group_dte_manager" model="res.groups">
+        <field name="name">DTE / Puede restablecer documentos electrónicos</field>
+        <field name="category_id" ref="base.module_category_accounting_accounting"/>
+        <field name="comment">
+            Permite restablecer el estado de un DTE (factura, nota o guía) que ya
+            cuenta con un sobre de envío ante el SII. Esta es una operación sensible:
+            solo debe usarse cuando el SII confirma que un documento fue rechazado
+            y se necesita reintentar con un folio nuevo.
+        </field>
+    </record>
+
+    <record id="rule_account_move_no_delete_dte" model="ir.rule">
+        <field name="name">DTE: no eliminar facturas con trámite ante el SII</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="domain_force">
+            [('estado_dte', 'not in', ['Aceptado', 'Reparo', 'Rechazado'])]
+        </field>
+        <field name="perm_unlink">1</field>
+        <field name="perm_read">0</field>
+        <field name="perm_write">0</field>
+        <field name="perm_create">0</field>
+    </record>
+
+    <record id="rule_stock_picking_no_delete_dte" model="ir.rule">
+        <field name="name">DTE: no eliminar guías con trámite ante el SII</field>
+        <field name="model_id" ref="stock.model_stock_picking"/>
+        <field name="domain_force">
+            [('estado_dte', 'not in', ['Aceptado', 'Reparo', 'Rechazado'])]
+        </field>
+        <field name="perm_unlink">1</field>
+        <field name="perm_read">0</field>
+        <field name="perm_write">0</field>
+        <field name="perm_create">0</field>
+    </record>
+
+    <record id="rule_xml_envio_no_delete_dte" model="ir.rule">
+        <field name="name">DTE: no eliminar sobres de envío válidos ante el SII</field>
+        <field name="model_id" ref="model_xml_envio"/>
+        <field name="domain_force">
+            [('state', 'not in', ['Aceptado', 'Reparo', 'Enviado', 'EnProceso', 'Proceso'])]
+        </field>
+        <field name="perm_unlink">1</field>
+        <field name="perm_read">0</field>
+        <field name="perm_write">0</field>
+        <field name="perm_create">0</field>
+    </record>
+
+</odoo>

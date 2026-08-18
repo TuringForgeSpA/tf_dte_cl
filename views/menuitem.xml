@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_tf_dte_cl_root" name="Facturación electrónica"
+              sequence="60" web_icon="tf_dte_cl,static/description/icon.png"/>
+
+    <menuitem id="menu_tf_dte_cl_documentos" name="Documentos"
+              parent="menu_tf_dte_cl_root" sequence="10"/>
+
+    <menuitem id="menu_tf_dte_cl_xml_envio" name="Sobres de envío SII"
+              parent="menu_tf_dte_cl_documentos" action="action_xml_envio" sequence="20"/>
+
+    <menuitem id="menu_tf_dte_cl_configuracion" name="Configuración"
+              parent="menu_tf_dte_cl_root" sequence="90"
+              groups="account.group_account_manager"/>
+
+    <menuitem id="menu_tf_dte_cl_config_dte" name="Configuración DTE"
+              parent="menu_tf_dte_cl_configuracion" action="action_config_dte" sequence="10"/>
+
+    <menuitem id="menu_tf_dte_cl_sii_firma" name="Certificados digitales"
+              parent="menu_tf_dte_cl_configuracion" action="action_sii_firma" sequence="20"/>
+
+</odoo>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_account_journal_form_tf_dte_cl" model="ir.ui.view">
+        <field name="name">account.journal.form.tf.dte.cl</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_form"/>
+        <field name="arch" type="xml">
+            <field name="type" position="after">
+                <field name="cod_dte" invisible="type != 'sale'"/>
+                <field name="config_dte_id" invisible="not cod_dte"/>
+                <field name="secuencia_id" invisible="not cod_dte"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

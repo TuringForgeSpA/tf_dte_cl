@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_move_form_tf_dte_cl" model="ir.ui.view">
+        <field name="name">account.move.form.tf.dte.cl</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//button[@name='preview_invoice']" position="after">
+                <button string="Imprimir DTE" type="object" name="imprimir_dte"
+                        invisible="state == 'draft' or not xml_envio_id"/>
+            </xpath>
+
+            <xpath expr="//field[@name='journal_id']" position="after">
+                <field name="sucursal_id"/>
+            </xpath>
+
+            <page name="other_info" position="after">
+
+                <page name="referencias_dte" string="Referencias"
+                      invisible="move_type not in ('out_invoice', 'out_refund')">
+                    <field name="referencias_ids">
+                        <list editable="bottom">
+                            <field name="folio" required="not ref_global"/>
+                            <field name="fecha_documento" required="1"/>
+                            <field name="tipo_documento"/>
+                            <field name="codigo_ref"/>
+                            <field name="motivo"/>
+                            <field name="ref_global"/>
+                        </list>
+                    </field>
+                </page>
+
+                <page name="dte" string="DTE"
+                      invisible="move_type not in ('out_invoice', 'out_refund')">
+                    <group>
+                        <group string="Estado ante el SII">
+                            <field name="track_id" readonly="1"/>
+                            <field name="estado_dte" readonly="1"/>
+                            <field name="detalle_estado" readonly="1"/>
+                        </group>
+                        <group string="Documento transmitido">
+                            <field name="xml_envio_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Acciones">
+                        <button string="Consultar estado" type="object" name="consulta_estado_dte"
+                                class="btn-secondary"
+                                invisible="state == 'draft' or not track_id"/>
+                        <button string="Restablecer" type="object" name="restablecer"
+                                class="btn-danger" groups="tf_dte_cl.group_dte_manager"
+                                invisible="not xml_envio_id"/>
+                    </group>
+                </page>
+
+            </page>
+
+        </field>
+    </record>
+
+    <record id="view_invoice_tree_tf_dte_cl" model="ir.ui.view">
+        <field name="name">account.invoice.tree.tf.dte.cl</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="journal_id" optional="show"/>
+                <field name="estado_dte" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

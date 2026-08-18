@@ -1,0 +1,11 @@
+id,name,codigo,country_id/id,state_id/id
+res_comuna_santiago,Santiago,13101,base.cl,base.state_cl_rm
+res_comuna_providencia,Providencia,13123,base.cl,base.state_cl_rm
+res_comuna_las_condes,Las Condes,13114,base.cl,base.state_cl_rm
+res_comuna_nunoa,Ñuñoa,13120,base.cl,base.state_cl_rm
+res_comuna_maipu,Maipú,13119,base.cl,base.state_cl_rm
+res_comuna_puente_alto,Puente Alto,13201,base.cl,base.state_cl_rm
+res_comuna_la_florida,La Florida,13110,base.cl,base.state_cl_rm
+res_comuna_vitacura,Vitacura,13132,base.cl,base.state_cl_rm
+res_comuna_recoleta,Recoleta,13126,base.cl,base.state_cl_rm
+res_comuna_independencia,Independencia,13106,base.cl,base.state_cl_rm

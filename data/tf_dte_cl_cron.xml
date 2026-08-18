@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Facturas / NC / ND: el envío (to_send -> sent) ya lo procesa el cron
+         nativo de account_edi ("Enviar documentos EDI por correo"). Solo se
+         agrega la consulta de estado, que es específica del negocio SII. -->
+    <record id="ir_cron_tf_dte_cl_consultar_estado_move" model="ir.cron">
+        <field name="name">TF DTE: Consultar estado de facturas en el SII</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_consultar_estado_dte()</field>
+        <field name="interval_number">30</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Guías de despacho: no usan account_edi (acoplado a account.move), por
+         lo que requieren su propio cron de envío asíncrono y de consulta. -->
+    <record id="ir_cron_tf_dte_cl_enviar_guias" model="ir.cron">
+        <field name="name">TF DTE: Timbrar y enviar guías de despacho pendientes</field>
+        <field name="model_id" ref="stock.model_stock_picking"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_procesar_guias_dte()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+
+    <record id="ir_cron_tf_dte_cl_consultar_estado_guias" model="ir.cron">
+        <field name="name">TF DTE: Consultar estado de guías de despacho en el SII</field>
+        <field name="model_id" ref="stock.model_stock_picking"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_consultar_estado_dte()</field>
+        <field name="interval_number">30</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+
+</odoo>

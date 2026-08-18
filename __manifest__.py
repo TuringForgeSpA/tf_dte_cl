@@ -1,28 +1,35 @@
+# -*- coding: utf-8 -*-
 {
-    'name': 'Facturación Electrónica Chile (SII)',
+    'name': 'Facturación electrónica SII Chile - Núcleo B2B',
+    'summary': 'Emisión de DTE B2B (Facturas, Notas de Crédito/Débito y Guías de Despacho) '
+               'sobre el framework EDI de Odoo.',
     'version': '18.0.1.0.0',
     'category': 'Accounting/Localizations/EDI',
-    'summary': 'Generación y envío de DTE al SII para Chile mediante framework EDI.',
-    'author': 'Turing Forge SpA',
-    'website': 'https://www.turingforge.cl',
-    'license': 'AGPL-3',
+    'license': 'LGPL-3',
+    'author': 'TF',
     'depends': [
         'account',
         'account_edi',
-        'l10n_cl', # Dependencia para usar los datos oficiales
+        'stock',
+        'contacts',
     ],
     'external_dependencies': {
-        'python': ['facturacion_electronica'], # Aquí se declara la librería de PIP de facturación electrónica
+        'python': ['facturacion_electronica', 'pdf417gen', 'lxml', 'PIL', 'OpenSSL', 'dateutil'],
     },
     'data': [
+        'security/security.xml',
         'security/ir.model.access.csv',
-        'security/state_manager.xml',
         'data/account_edi_data.xml',
-        'data/account.move.docs.sii.csv',
-        'data/comunas_utf.csv',
-        # ... el resto de las vistas ...
+        'data/tf_dte_cl_cron.xml',
+        'data/account_move_docs_sii.csv',
+        'data/res_comuna.csv',
+        'views/account_journal_views.xml',
+        'views/config_dte_views.xml',
+        'views/xml_envio_views.xml',
+        'views/account_move_views.xml',
+        'views/stock_picking_views.xml',
+        'views/menuitem.xml',
     ],
     'installable': True,
     'application': False,
-    'auto_install': False,
 }

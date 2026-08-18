@@ -1,0 +1,13 @@
+id,codigo,name
+account_move_docs_sii_30,30,Factura
+account_move_docs_sii_32,32,Factura exenta
+account_move_docs_sii_33,33,Factura electrónica
+account_move_docs_sii_34,34,Factura exenta electrónica
+account_move_docs_sii_43,43,Liquidación factura electrónica
+account_move_docs_sii_46,46,Factura de compra electrónica
+account_move_docs_sii_52,52,Guía de despacho electrónica
+account_move_docs_sii_56,56,Nota de débito electrónica
+account_move_docs_sii_61,61,Nota de crédito electrónica
+account_move_docs_sii_110,110,Factura de exportación electrónica
+account_move_docs_sii_111,111,Nota de débito de exportación electrónica
+account_move_docs_sii_112,112,Nota de crédito de exportación electrónica

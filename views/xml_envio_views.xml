@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_xml_envio_form" model="ir.ui.view">
+        <field name="name">xml.envio.form</field>
+        <field name="model">xml.envio</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button string="Consultar estado" type="object" name="action_consultar_estado_dte"
+                            class="btn-primary" invisible="not sii_send_ident"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="move_id" readonly="1"/>
+                            <field name="pick_id" readonly="1"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="sii_send_ident" readonly="1"/>
+                            <field name="sii_barcode" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="XML de envío">
+                            <field name="sii_xml_request" readonly="1"/>
+                        </page>
+                        <page string="Respuesta del SII">
+                            <field name="sii_receipt" readonly="1"/>
+                            <field name="sii_xml_response" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_xml_envio_tree" model="ir.ui.view">
+        <field name="name">xml.envio.tree</field>
+        <field name="model">xml.envio</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="move_id"/>
+                <field name="pick_id"/>
+                <field name="sii_send_ident"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'Aceptado'"
+                       decoration-warning="state == 'Reparo'"
+                       decoration-danger="state == 'Rechazado'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_xml_envio" model="ir.actions.act_window">
+        <field name="name">Sobres de envío SII</field>
+        <field name="res_model">xml.envio</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

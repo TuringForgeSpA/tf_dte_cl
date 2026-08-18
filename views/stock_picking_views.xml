@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_picking_type_form_tf_dte_cl" model="ir.ui.view">
+        <field name="name">stock.picking.type.form.tf.dte.cl</field>
+        <field name="model">stock.picking.type</field>
+        <field name="inherit_id" ref="stock.view_picking_type_form"/>
+        <field name="arch" type="xml">
+            <field name="sequence_code" position="after">
+                <group string="Documento tributario electrónico">
+                    <field name="cod_dte"/>
+                    <field name="config_dte_id" invisible="not cod_dte"/>
+                    <field name="secuencia_id" invisible="not cod_dte"/>
+                    <field name="sucursal_nombre" invisible="not cod_dte"/>
+                    <field name="sucursal_codsii" invisible="not cod_dte"/>
+                </group>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_picking_form_tf_dte_cl" model="ir.ui.view">
+        <field name="name">stock.picking.form.tf.dte.cl</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button string="Imprimir DTE" type="object" name="imprimir_dte" class="oe_stat_button"
+                        icon="fa-print" invisible="not xml_envio_id"/>
+            </xpath>
+
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="sucursal_id" invisible="not es_dte"/>
+            </xpath>
+
+            <page name="note" position="before">
+
+                <page name="datos_traslado" string="Datos de traslado" invisible="not es_dte">
+                    <group>
+                        <group>
+                            <field name="tipo_despacho" required="es_dte"/>
+                            <field name="indicacion_traslado" required="es_dte"/>
+                            <field name="forma_pago" required="es_dte"/>
+                            <field name="transportista_id"/>
+                        </group>
+                        <group string="Dirección de destino">
+                            <field name="direccion_destino"/>
+                            <field name="country_id"/>
+                            <field name="state_id"/>
+                            <field name="comuna_id"/>
+                            <field name="ciudad"/>
+                        </group>
+                    </group>
+                    <group string="Referencias">
+                        <field name="referencias_ids" nolabel="1">
+                            <list editable="bottom">
+                                <field name="folio" required="not ref_global"/>
+                                <field name="fecha_documento" required="1"/>
+                                <field name="tipo_documento"/>
+                                <field name="codigo_ref"/>
+                                <field name="motivo"/>
+                                <field name="ref_global"/>
+                            </list>
+                        </field>
+                    </group>
+                </page>
+
+                <page name="dte" string="DTE" invisible="not es_dte">
+                    <group>
+                        <group string="Estado de envío">
+                            <field name="dte_send_state" readonly="1"/>
+                            <field name="track_id" readonly="1"/>
+                            <field name="estado_dte" readonly="1"/>
+                            <field name="detalle_estado" readonly="1"/>
+                        </group>
+                        <group string="Documento transmitido">
+                            <field name="xml_envio_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Acciones">
+                        <button string="Consultar estado" type="object" name="consulta_estado_dte"
+                                class="btn-secondary"
+                                invisible="not track_id"/>
+                        <button string="Restablecer" type="object" name="restablecer"
+                                class="btn-danger" groups="tf_dte_cl.group_dte_manager"
+                                invisible="not xml_envio_id and dte_send_state != 'error'"/>
+                    </group>
+                </page>
+
+            </page>
+
+        </field>
+    </record>
+
+    <record id="view_picking_tree_tf_dte_cl" model="ir.ui.view">
+        <field name="name">stock.picking.tree.tf.dte.cl</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="estado_dte" optional="show"/>
+                <field name="dte_send_state" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

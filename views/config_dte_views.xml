@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_config_dte_form" model="ir.ui.view">
+        <field name="name">config.dte.form</field>
+        <field name="model">config.dte</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Datos del emisor">
+                            <field name="name"/>
+                            <field name="rutemisor"/>
+                            <field name="giroemisor"/>
+                            <field name="dirorigen"/>
+                            <field name="cmnaorigen"/>
+                            <field name="ciudadorigen"/>
+                            <field name="oficinasii"/>
+                            <field name="actecos" widget="many2many_tags"/>
+                        </group>
+                        <group string="Configuración general">
+                            <field name="modo"/>
+                            <field name="formato_impresion"/>
+                            <field name="nroresol"/>
+                            <field name="fchresol"/>
+                            <field name="valoriva"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="con_logo"/>
+                        </group>
+                    </group>
+                    <group string="Firma electrónica">
+                        <field name="firma_id"/>
+                        <field name="init_signature"/>
+                        <group invisible="firma_id" string="Datos de respaldo (sin certificado gestionado)">
+                            <field name="rut_firmante"/>
+                            <field name="priv_key" password="True"/>
+                            <field name="cert" password="True"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Archivos CAF">
+                            <field name="caf_files_ids">
+                                <list editable="bottom">
+                                    <field name="caf" invisible="1"/>
+                                    <field name="name" readonly="1"/>
+                                    <field name="desde" readonly="1"/>
+                                    <field name="hasta" readonly="1"/>
+                                    <field name="fecha" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Sucursales">
+                            <field name="sucursal_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="country_id"/>
+                                    <field name="state_id"/>
+                                    <field name="cmna_id"/>
+                                    <field name="ciudad"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_config_dte_tree" model="ir.ui.view">
+        <field name="name">config.dte.tree</field>
+        <field name="model">config.dte</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="rutemisor"/>
+                <field name="modo"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_config_dte" model="ir.actions.act_window">
+        <field name="name">Configuración DTE</field>
+        <field name="res_model">config.dte</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_sii_firma_form" model="ir.ui.view">
+        <field name="name">sii.firma.form</field>
+        <field name="model">sii.firma</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button string="Procesar" type="object" name="action_process" class="btn-primary"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="file_content" filename="name" required="not subject_serial_number"/>
+                            <field name="password" password="True" invisible="subject_serial_number"/>
+                        </group>
+                        <group>
+                            <field name="subject_common_name" readonly="1"/>
+                            <field name="subject_serial_number"/>
+                            <field name="subject_email_address" readonly="1"/>
+                            <field name="issuer_common_name" readonly="1"/>
+                            <field name="emision_date" readonly="1"/>
+                            <field name="expire_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="company_ids" widget="many2many_tags"/>
+                        <field name="user_ids" widget="many2many_tags"/>
+                        <field name="priority"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sii_firma_tree" model="ir.ui.view">
+        <field name="name">sii.firma.tree</field>
+        <field name="model">sii.firma</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="state == 'expired'" decoration-success="state == 'valid'">
+                <field name="name"/>
+                <field name="subject_common_name"/>
+                <field name="expire_date"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_sii_firma" model="ir.actions.act_window">
+        <field name="name">Certificados digitales</field>
+        <field name="res_model">sii.firma</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

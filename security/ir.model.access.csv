@@ -1,0 +1,14 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_account_move_docs_sii,account.move.docs.sii,model_account_move_docs_sii,account.group_account_invoice,1,0,0,0
+access_account_move_docs_sii_manager,account.move.docs.sii manager,model_account_move_docs_sii,account.group_account_manager,1,1,1,1
+access_account_move_referencia,account.move.referencia,model_account_move_referencia,account.group_account_invoice,1,1,1,1
+access_xml_envio,xml.envio,model_xml_envio,account.group_account_invoice,1,1,1,0
+access_xml_envio_manager,xml.envio manager,model_xml_envio,account.group_account_manager,1,1,1,1
+access_config_dte,config.dte,model_config_dte,account.group_account_invoice,1,0,0,0
+access_config_dte_manager,config.dte manager,model_config_dte,account.group_account_manager,1,1,1,1
+access_config_dte_caf,config.dte.caf,model_config_dte_caf,account.group_account_manager,1,1,1,1
+access_config_sucursales,config.sucursales,model_config_sucursales,account.group_account_invoice,1,0,0,0
+access_config_sucursales_manager,config.sucursales manager,model_config_sucursales,account.group_account_manager,1,1,1,1
+access_actecos_dte,actecos.dte,model_actecos_dte,account.group_account_manager,1,1,1,1
+access_sii_firma,sii.firma,model_sii_firma,account.group_account_manager,1,1,1,1
+access_tf_dte_builder_mixin,tf.dte.builder.mixin,model_tf_dte_builder_mixin,base.group_user,1,0,0,0
