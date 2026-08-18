@@ -91,7 +91,7 @@ SII_ESTADO_EN_PROCESO = {
 XML_ENVIO_STATE_MAP = {
     ESTADO_ACEPTADO: 'Aceptado',
     ESTADO_RECHAZADO: 'Rechazado',
-    ESTADO_REPARO: 'Aceptado',
+    ESTADO_REPARO: 'Reparo',
     ESTADO_EN_PROCESO: 'EnProceso',
 }
 
