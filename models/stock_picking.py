@@ -391,10 +391,15 @@ class StockPicking(models.Model):
         conf = self.picking_type_id.config_dte_id
         if not conf:
             return True
-        reporte = 'action_imprimir_documento_termico' if conf.formato_impresion in ('tera4', 'terter') \
+        reporte = 'action_imprimir_guia_termico' if conf.formato_impresion == 'a4ter' \
             else 'action_imprimir_dte_guia'
         return self.env.ref('tf_dte_cl.%s' % reporte).report_action(self)
 
     def _get_printed_report_name(self):
         self.ensure_one()
         return '%s %s' % (self.picking_type_id.name, self._dte_formato_numero(self._dte_folio(self.name)))
+
+    def numero_documento(self):
+        self.ensure_one()
+        digitos = self._dte_folio(self.name)
+        return self._dte_formato_numero(digitos) if digitos else ''

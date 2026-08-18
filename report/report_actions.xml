@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Facturas / Notas de crédito / Notas de débito -->
+
+    <record id="action_imprimir_dte" model="ir.actions.report">
+        <field name="name">Imprimir DTE</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">tf_dte_cl.report_move_dte_a4</field>
+        <field name="report_file">tf_dte_cl.report_move_dte_a4</field>
+        <field name="print_report_name">object._get_printed_report_name()</field>
+        <field name="attachment_use" eval="False"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <record id="action_imprimir_documento_termico" model="ir.actions.report">
+        <field name="name">Imprimir DTE (térmico)</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">tf_dte_cl.report_move_dte_termico</field>
+        <field name="report_file">tf_dte_cl.report_move_dte_termico</field>
+        <field name="print_report_name">object._get_printed_report_name()</field>
+        <field name="attachment_use" eval="False"/>
+        <field name="paperformat_id" ref="tf_dte_cl.paperformat_tf_dte_termico"/>
+    </record>
+
+    <!-- Guías de despacho -->
+
+    <record id="action_imprimir_dte_guia" model="ir.actions.report">
+        <field name="name">Imprimir guía de despacho DTE</field>
+        <field name="model">stock.picking</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">tf_dte_cl.report_picking_dte_a4</field>
+        <field name="report_file">tf_dte_cl.report_picking_dte_a4</field>
+        <field name="print_report_name">object._get_printed_report_name()</field>
+        <field name="attachment_use" eval="False"/>
+        <field name="binding_model_id" ref="stock.model_stock_picking"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <record id="action_imprimir_guia_termico" model="ir.actions.report">
+        <field name="name">Imprimir guía de despacho DTE (térmico)</field>
+        <field name="model">stock.picking</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">tf_dte_cl.report_picking_dte_termico</field>
+        <field name="report_file">tf_dte_cl.report_picking_dte_termico</field>
+        <field name="print_report_name">object._get_printed_report_name()</field>
+        <field name="attachment_use" eval="False"/>
+        <field name="paperformat_id" ref="tf_dte_cl.paperformat_tf_dte_termico"/>
+    </record>
+
+</odoo>

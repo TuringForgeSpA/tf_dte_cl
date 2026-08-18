@@ -355,7 +355,9 @@ class AccountMove(models.Model):
         return True
 
     def termica_a4(self, conf):
-        return conf.formato_impresion == 'a4ter' if not self.env.context.get('a4') else False
+        if self.env.context.get('a4'):
+            return False
+        return conf.formato_impresion == 'a4ter'
 
     def imprimir_dte(self):
         self.ensure_one()
@@ -376,15 +378,6 @@ class AccountMove(models.Model):
 
     def nombre_referencia(self, num_ref):
         return dict(Referencias.COD_REF).get(num_ref, '')
-
-    def contacto(self, partner):
-        if partner.child_ids:
-            contactos = partner.child_ids.filtered(lambda c: c.type == 'contact')
-            return ' - '.join(filter(None, (
-                '%s %s %s %s' % (c.name, c.email or '', c.phone or '', c.mobile or '')
-                for c in contactos
-            )))
-        return ' - '.join(filter(None, [partner.phone, partner.mobile, partner.email]))
 
     def exento(self):
         exento = sum(

@@ -45,6 +45,10 @@ class TfDteBuilderMixin(models.AbstractModel):
         """Extrae solo los dígitos del nombre de la secuencia (ej: 'FAC/2026/00045' -> '202600045')."""
         return ''.join(c for c in (nombre or '') if c.isdigit())
 
+    def _dte_fecha_resol(self, fecha):
+        """Año de la resolución SII, para el texto del timbre impreso."""
+        return (fecha or '').split('-')[0]
+
     # ------------------------------------------------------------------
     # Emisor / firma / CAF
     # ------------------------------------------------------------------
@@ -164,3 +168,22 @@ class TfDteBuilderMixin(models.AbstractModel):
         if not res and cod_dte in requiere_referencia:
             raise UserError(_('Debe agregar al menos una referencia para este tipo de documento.'))
         return res
+
+    # ------------------------------------------------------------------
+    # Utilidades de impresión, compartidas entre facturas/NC/ND y guías
+    # ------------------------------------------------------------------
+    def contacto(self, partner):
+        """Arma una línea de contacto legible a partir de los contactos hijos del
+        partner (si los tiene) o de sus propios datos de teléfono/correo."""
+        if partner.child_ids:
+            contactos = partner.child_ids.filtered(lambda c: c.type == 'contact')
+            return ' - '.join(filter(None, (
+                '%s %s %s %s' % (c.name, c.email or '', c.phone or '', c.mobile or '')
+                for c in contactos
+            )))
+        return ' - '.join(filter(None, [partner.phone, partner.mobile, partner.email]))
+
+    def _dte_fecha_resol(self, fecha_resolucion):
+        """Extrae el año de la fecha de resolución SII (formato 'YYYY-MM-DD') para
+        el texto del timbre electrónico ('Resolución N° X de <año>')."""
+        return (fecha_resolucion or '').split('-')[0]

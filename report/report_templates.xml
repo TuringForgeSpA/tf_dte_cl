@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================
+         Subplantillas compartidas
+         ================================================================ -->
+
+    <template id="encabezado_dte">
+        <!-- Espera en el scope: o, config_id, logo, document_name -->
+        <div class="header">
+            <div class="row">
+                <div class="col-7" style="text-align:center;">
+                    <img t-if="config_id.con_logo" t-att-src="'data:image/png;base64,%s' % to_text(logo)"
+                         style="max-height:45px;"/>
+                    <h4 style="text-transform:uppercase;font-weight:900;font-size:18px;color:black;">
+                        <span t-field="config_id.name"/>
+                    </h4>
+                    <p style="font-size:12px;color:black;text-transform:uppercase;">
+                        <span t-field="config_id.giroemisor"/><br/>
+                        <span>Casa matriz: </span><span t-field="config_id.dirorigen"/>,
+                        <span t-field="config_id.cmnaorigen"/>, <span t-field="config_id.ciudadorigen"/><br/>
+                        <t t-if="config_id.sucursal_ids">
+                            <t t-foreach="config_id.sucursal_ids" t-as="sucursal">
+                                <t t-if="o.sucursal_ok(sucursal)">
+                                    <span>Sucursal: </span><span t-field="sucursal.name"/>,
+                                    <span t-field="sucursal.cmna_id.name"/>, <span t-field="sucursal.ciudad"/><br/>
+                                </t>
+                            </t>
+                        </t>
+                        <span>Teléfono: <span t-field="config_id.telefono"/></span><br/>
+                        <span>Correo: <span t-field="config_id.correo"/></span>
+                    </p>
+                </div>
+                <div class="col-5">
+                    <div style="border:3px solid red;text-align:center;height:145px;">
+                        <h6 style="color:red;font-size:20px;padding-top:5px;">
+                            R.U.T.: <span t-esc="o._dte_formato_rut(config_id.rutemisor)"/>
+                        </h6>
+                        <h6 style="color:red;font-size:20px;text-transform:uppercase;">
+                            <span t-esc="document_name"/>
+                        </h6>
+                        <h6 style="color:red;font-size:20px;">
+                            N° <span t-esc="o.numero_documento()"/>
+                        </h6>
+                    </div>
+                    <p style="color:red;font-size:11px;text-transform:uppercase;text-align:center;">
+                        SII - <span t-field="config_id.oficinasii"/>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="timbre_sii">
+        <!-- Espera en el scope: o, config_id -->
+        <div class="col-5">
+            <t t-if="o.xml_envio_id and o.xml_envio_id.sii_barcode_img">
+                <img t-att-src="'data:image/png;base64,%s' % to_text(o.xml_envio_id.sii_barcode_img)"/>
+                <p style="text-align:center;color:red;font-size:8px;">
+                    Timbre electrónico SII<br/>
+                    Resolución <t t-esc="config_id.nroresol"/> de <t t-esc="o._dte_fecha_resol(config_id.fchresol)"/>.
+                    Verifique este documento en www.sii.cl
+                </p>
+            </t>
+        </div>
+    </template>
+
+    <!-- ================================================================
+         Facturas / notas de crédito / notas de débito — A4
+         ================================================================ -->
+
+    <template id="formato_dte_move_a4">
+        <t t-set="o" t-value="o.with_context(lang='es_CL')"/>
+        <t t-call="web.basic_layout">
+            <t t-set="company" t-value="o.company_id.sudo()"/>
+            <t t-set="partner_id" t-value="o.partner_id"/>
+            <t t-set="commercial_partner_id" t-value="o.partner_id.commercial_partner_id"/>
+            <t t-set="logo" t-value="company.logo"/>
+            <t t-set="config_id" t-value="o.journal_id.config_dte_id"/>
+            <t t-set="document_name" t-value="o.journal_id.name"/>
+
+            <t t-call="tf_dte_cl.encabezado_dte"/>
+
+            <div class="page" style="padding-top:60px;">
+                <div class="row" style="border:2px solid black;">
+                    <table class="table" style="margin-bottom:0;">
+                        <tbody>
+                            <tr>
+                                <td><strong>Señor(es):</strong></td>
+                                <td><span t-field="commercial_partner_id.name"/></td>
+                                <td><strong>Fecha:</strong></td>
+                                <td><span t-field="o.date"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>RUT:</strong></td>
+                                <td><span t-esc="o._dte_formato_rut(commercial_partner_id.vat)"/></td>
+                                <td><strong>Comuna:</strong></td>
+                                <td><span t-field="partner_id.comuna_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Domicilio:</strong></td>
+                                <td><span t-field="partner_id.street"/> <span t-field="partner_id.street2"/></td>
+                                <td><strong>Ciudad:</strong></td>
+                                <td><span t-field="partner_id.city"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Giro:</strong></td>
+                                <td><span t-field="partner_id.giro"/></td>
+                                <td><strong>Condición de pago:</strong></td>
+                                <td><span t-if="o.payment_term_id" t-field="o.payment_term_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Contacto:</strong></td>
+                                <td><span t-esc="o.contacto(partner_id)"/></td>
+                                <td><strong>Vencimiento:</strong></td>
+                                <td><span t-field="o.invoice_date_due"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <t t-if="o.referencias_ids">
+                    <span style="font-size:8px;">Documento de referencia</span>
+                    <table class="table table-sm" style="border:2px solid black;">
+                        <thead>
+                            <tr>
+                                <th>Folio</th>
+                                <th>Referencia</th>
+                                <th>Motivo/observación</th>
+                                <th>Fecha del documento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="o.referencias_ids" t-as="l">
+                                <td><span t-if="l.folio" t-field="l.folio"/></td>
+                                <td><span t-if="l.tipo_documento" t-field="l.tipo_documento.name"/></td>
+                                <td>
+                                    <t t-if="l.codigo_ref"><span t-esc="o.nombre_referencia(l.codigo_ref)"/> : </t>
+                                    <span t-if="l.motivo" t-field="l.motivo"/>
+                                </td>
+                                <td><span t-if="l.fecha_documento" t-field="l.fecha_documento"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </t>
+
+                <t t-set="display_discount" t-value="any(l.discount for l in o.invoice_line_ids)"/>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th class="text-start">Precio unitario</th>
+                            <th t-if="display_discount" class="text-end">Desc. (%)</th>
+                            <th class="text-start">Precio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.invoice_line_ids.filtered(lambda line: line.account_id and line.product_id)"
+                            t-as="l">
+                            <td><span t-field="l.product_id.default_code"/></td>
+                            <td><span t-field="l.name"/></td>
+                            <td><span t-field="l.quantity"/> <span t-field="l.product_uom_id"/></td>
+                            <td class="text-start"><span t-esc="o.currency_format(l.price_unit, 'Product Price')"/></td>
+                            <td t-if="display_discount" class="text-end"><span t-esc="o.descuento(l.discount)"/></td>
+                            <td class="text-start">
+                                <span t-field="l.price_subtotal"
+                                      t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div t-if="o.narration" class="row">
+                    <table class="table table-sm" style="border:1px solid black;">
+                        <thead><tr><th>Observaciones</th></tr></thead>
+                        <tbody><tr><td><span t-field="o.narration"/></td></tr></tbody>
+                    </table>
+                </div>
+
+                <div class="row">
+                    <t t-call="tf_dte_cl.timbre_sii"/>
+                    <div class="col-5 offset-2">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Subtotal</strong></td>
+                                <td class="text-end">
+                                    <span t-field="o.amount_untaxed"
+                                          t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                </td>
+                            </tr>
+                            <tr t-if="o.getTotalDiscount()">
+                                <td><strong>Descuento</strong></td>
+                                <td class="text-end">
+                                    <span t-esc="o.getTotalDiscount()"
+                                          t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                </td>
+                            </tr>
+                            <t t-set="monto_exento" t-value="o.exento()"/>
+                            <tr t-if="monto_exento &gt; 0">
+                                <td><span>Exento</span></td>
+                                <td class="text-end">
+                                    <span t-esc="monto_exento"
+                                          t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                </td>
+                            </tr>
+                            <t t-foreach="o.line_ids.filtered(lambda line: line.tax_line_id)" t-as="t">
+                                <tr t-if="t.tax_line_id.codigo_sii in (14, 15, 17)">
+                                    <td><span t-field="t.tax_line_id.description"/></td>
+                                    <td class="text-end">
+                                        <span t-esc="t.debit or t.credit"
+                                              t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                    </td>
+                                </tr>
+                            </t>
+                            <tr style="border-top:1px solid black;">
+                                <td><strong>Total</strong></td>
+                                <td class="text-end">
+                                    <span t-field="o.amount_total"
+                                          t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_move_dte_a4">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-if="o.name" t-call="tf_dte_cl.formato_dte_move_a4" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+
+    <!-- ================================================================
+         Facturas / notas de crédito / notas de débito — térmico 80mm
+         ================================================================ -->
+
+    <template id="formato_dte_move_termico">
+        <t t-set="o" t-value="o.with_context(lang='es_CL')"/>
+        <t t-set="config_id" t-value="o.journal_id.config_dte_id"/>
+        <div style="font-size:9px;width:100%;">
+            <p style="text-align:center;font-weight:900;text-transform:uppercase;">
+                <span t-field="config_id.name"/><br/>
+                R.U.T.: <span t-esc="o._dte_formato_rut(config_id.rutemisor)"/><br/>
+                <span t-field="o.journal_id.name"/><br/>
+                N° <span t-esc="o.numero_documento()"/>
+            </p>
+            <p>
+                Señor(es): <span t-field="o.partner_id.name"/><br/>
+                RUT: <span t-esc="o._dte_formato_rut(o.partner_id.vat)"/><br/>
+                Fecha: <span t-field="o.date"/>
+            </p>
+            <table style="width:100%;">
+                <tr t-foreach="o.invoice_line_ids.filtered(lambda line: line.account_id and line.product_id)"
+                    t-as="l">
+                    <td><span t-field="l.quantity"/> x <span t-field="l.name"/></td>
+                    <td class="text-end">
+                        <span t-field="l.price_subtotal"
+                              t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                    </td>
+                </tr>
+            </table>
+            <p style="text-align:right;font-weight:900;">
+                Total: <span t-field="o.amount_total"
+                              t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+            </p>
+            <div style="text-align:center;">
+                <img t-if="o.xml_envio_id and o.xml_envio_id.sii_barcode_img"
+                     t-att-src="'data:image/png;base64,%s' % to_text(o.xml_envio_id.sii_barcode_img)"
+                     style="max-width:100%;"/>
+                <p style="font-size:7px;">
+                    Timbre electrónico SII — Resolución <t t-esc="config_id.nroresol"/> de
+                    <t t-esc="o._dte_fecha_resol(config_id.fchresol)"/>.<br/>
+                    Verifique este documento en www.sii.cl
+                </p>
+            </div>
+        </div>
+    </template>
+
+    <template id="report_move_dte_termico">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-if="o.name" t-call="tf_dte_cl.formato_dte_move_termico" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+
+    <!-- ================================================================
+         Guías de despacho — A4
+         ================================================================ -->
+
+    <template id="formato_dte_picking_a4">
+        <t t-set="o" t-value="o.with_context(lang='es_CL')"/>
+        <t t-call="web.basic_layout">
+            <t t-set="company" t-value="o.company_id.sudo()"/>
+            <t t-set="partner_id" t-value="o.partner_id"/>
+            <t t-set="commercial_partner_id" t-value="o.partner_id.commercial_partner_id"/>
+            <t t-set="logo" t-value="company.logo"/>
+            <t t-set="config_id" t-value="o.picking_type_id.config_dte_id"/>
+            <t t-set="document_name" t-value="o.picking_type_id.name"/>
+
+            <t t-call="tf_dte_cl.encabezado_dte"/>
+
+            <div class="page" style="padding-top:60px;">
+                <div class="row" style="border:2px solid black;">
+                    <table class="table" style="margin-bottom:0;">
+                        <tbody>
+                            <tr>
+                                <td><strong>Señor(es):</strong></td>
+                                <td><span t-field="commercial_partner_id.name"/></td>
+                                <td><strong>Fecha:</strong></td>
+                                <td><span t-field="o.scheduled_date"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>RUT:</strong></td>
+                                <td><span t-esc="o._dte_formato_rut(commercial_partner_id.vat)"/></td>
+                                <td><strong>Comuna destino:</strong></td>
+                                <td><span t-field="o.comuna_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dirección de destino:</strong></td>
+                                <td><span t-field="o.direccion_destino"/></td>
+                                <td><strong>Ciudad:</strong></td>
+                                <td><span t-field="o.ciudad"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tipo de despacho:</strong></td>
+                                <td><span t-field="o.tipo_despacho"/></td>
+                                <td><strong>Indicador de traslado:</strong></td>
+                                <td><span t-field="o.indicacion_traslado"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Transportista:</strong></td>
+                                <td><span t-if="o.transportista_id" t-field="o.transportista_id.name"/></td>
+                                <td><strong>Forma de pago:</strong></td>
+                                <td><span t-field="o.forma_pago"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <t t-if="o.referencias_ids">
+                    <span style="font-size:8px;">Documento de referencia</span>
+                    <table class="table table-sm" style="border:2px solid black;">
+                        <thead>
+                            <tr>
+                                <th>Folio</th>
+                                <th>Referencia</th>
+                                <th>Motivo/observación</th>
+                                <th>Fecha del documento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="o.referencias_ids" t-as="l">
+                                <td><span t-if="l.folio" t-field="l.folio"/></td>
+                                <td><span t-if="l.tipo_documento" t-field="l.tipo_documento.name"/></td>
+                                <td>
+                                    <t t-if="l.codigo_ref"><span t-esc="o.nombre_referencia(l.codigo_ref)"/> : </t>
+                                    <span t-if="l.motivo" t-field="l.motivo"/>
+                                </td>
+                                <td><span t-if="l.fecha_documento" t-field="l.fecha_documento"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </t>
+
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Unidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.move_ids.filtered('picked')" t-as="l">
+                            <td><span t-field="l.product_id.name"/></td>
+                            <td><span t-field="l.quantity"/></td>
+                            <td><span t-field="l.product_uom"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="row">
+                    <t t-call="tf_dte_cl.timbre_sii"/>
+                </div>
+
+                <div class="row" style="padding-top:15px;">
+                    <table style="width:100%;font-size:12px;border:1px solid black;">
+                        <tr>
+                            <td style="width:35%;border-right:1px solid black;">Nombre:</td>
+                            <td style="width:35%;border-right:1px solid black;">RUT:</td>
+                            <td style="width:30%;">Fecha:</td>
+                        </tr>
+                        <tr>
+                            <td style="border-right:1px solid black;">Recinto:</td>
+                            <td style="border-right:1px solid black;">Firma:</td>
+                            <td/>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_picking_dte_a4">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-if="o.name" t-call="tf_dte_cl.formato_dte_picking_a4" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+
+    <!-- ================================================================
+         Guías de despacho — térmico 80mm
+         ================================================================ -->
+
+    <template id="formato_dte_picking_termico">
+        <t t-set="o" t-value="o.with_context(lang='es_CL')"/>
+        <t t-set="config_id" t-value="o.picking_type_id.config_dte_id"/>
+        <div style="font-size:9px;width:100%;">
+            <p style="text-align:center;font-weight:900;text-transform:uppercase;">
+                <span t-field="config_id.name"/><br/>
+                R.U.T.: <span t-esc="o._dte_formato_rut(config_id.rutemisor)"/><br/>
+                <span t-field="o.picking_type_id.name"/><br/>
+                N° <span t-esc="o.numero_documento()"/>
+            </p>
+            <p>
+                Señor(es): <span t-field="o.partner_id.name"/><br/>
+                RUT: <span t-esc="o._dte_formato_rut(o.partner_id.vat)"/><br/>
+                Destino: <span t-field="o.direccion_destino"/>
+            </p>
+            <table style="width:100%;">
+                <tr t-foreach="o.move_ids.filtered('picked')" t-as="l">
+                    <td><span t-field="l.quantity"/> x <span t-field="l.product_id.name"/></td>
+                </tr>
+            </table>
+            <div style="text-align:center;">
+                <img t-if="o.xml_envio_id and o.xml_envio_id.sii_barcode_img"
+                     t-att-src="'data:image/png;base64,%s' % to_text(o.xml_envio_id.sii_barcode_img)"
+                     style="max-width:100%;"/>
+                <p style="font-size:7px;">
+                    Timbre electrónico SII — Resolución <t t-esc="config_id.nroresol"/> de
+                    <t t-esc="o._dte_fecha_resol(config_id.fchresol)"/>.<br/>
+                    Verifique este documento en www.sii.cl
+                </p>
+            </div>
+        </div>
+    </template>
+
+    <template id="report_picking_dte_termico">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-if="o.name" t-call="tf_dte_cl.formato_dte_picking_termico" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+
+</odoo>
