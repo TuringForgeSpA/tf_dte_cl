@@ -1,0 +1,347 @@
+name,codigo,region
+Iquique,1101,Tarapacá
+Alto Hospicio,1107,Tarapacá
+Pozo Almonte,1401,Tarapacá
+Camiña,1402,Tarapacá
+Colchane,1403,Tarapacá
+Huara,1404,Tarapacá
+Pica,1405,Tarapacá
+Antofagasta,2101,Antofagasta
+Mejillones,2102,Antofagasta
+Sierra Gorda,2103,Antofagasta
+Taltal,2104,Antofagasta
+Calama,2201,Antofagasta
+Ollagüe,2202,Antofagasta
+San Pedro de Atacama,2203,Antofagasta
+Tocopilla,2301,Antofagasta
+María Elena,2302,Antofagasta
+Copiapó,3101,Atacama
+Caldera,3102,Atacama
+Tierra Amarilla,3103,Atacama
+Chañaral,3201,Atacama
+Diego de Almagro,3202,Atacama
+Vallenar,3301,Atacama
+Alto del Carmen,3302,Atacama
+Freirina,3303,Atacama
+Huasco,3304,Atacama
+La Serena,4101,Coquimbo
+Coquimbo,4102,Coquimbo
+Andacollo,4103,Coquimbo
+La Higuera,4104,Coquimbo
+Paihuano,4105,Coquimbo
+Vicuña,4106,Coquimbo
+Illapel,4201,Coquimbo
+Canela,4202,Coquimbo
+Los Vilos,4203,Coquimbo
+Salamanca,4204,Coquimbo
+Ovalle,4301,Coquimbo
+Combarbalá,4302,Coquimbo
+Monte Patria,4303,Coquimbo
+Punitaqui,4304,Coquimbo
+Río Hurtado,4305,Coquimbo
+Valparaíso,5101,Valparaíso
+Casablanca,5102,Valparaíso
+Concón,5103,Valparaíso
+Juan Fernández,5104,Valparaíso
+Puchuncaví,5105,Valparaíso
+Quintero,5107,Valparaíso
+Viña del Mar,5109,Valparaíso
+Isla de Pascua,5201,Valparaíso
+Los Andes,5301,Valparaíso
+Calle Larga,5302,Valparaíso
+Rinconada,5303,Valparaíso
+San Esteban,5304,Valparaíso
+La Ligua,5401,Valparaíso
+Cabildo,5402,Valparaíso
+Papudo,5403,Valparaíso
+Petorca,5404,Valparaíso
+Zapallar,5405,Valparaíso
+Quillota,5501,Valparaíso
+La Calera,5502,Valparaíso
+Hijuelas,5503,Valparaíso
+La Cruz,5504,Valparaíso
+Nogales,5506,Valparaíso
+San Antonio,5601,Valparaíso
+Algarrobo,5602,Valparaíso
+Cartagena,5603,Valparaíso
+El Quisco,5604,Valparaíso
+El Tabo,5605,Valparaíso
+Santo Domingo,5606,Valparaíso
+San Felipe,5701,Valparaíso
+Catemu,5702,Valparaíso
+Llay Llay,5703,Valparaíso
+Panquehue,5704,Valparaíso
+Putaendo,5705,Valparaíso
+Santa María,5706,Valparaíso
+Quilpué,5801,Valparaíso
+Limache,5802,Valparaíso
+Olmué,5803,Valparaíso
+Villa Alemana,5804,Valparaíso
+Rancagua,6101,del Libertador Gral. Bernardo O'Higgins
+Codegua,6102,del Libertador Gral. Bernardo O'Higgins
+Coinco,6103,del Libertador Gral. Bernardo O'Higgins
+Coltauco,6104,del Libertador Gral. Bernardo O'Higgins
+Doñihue,6105,del Libertador Gral. Bernardo O'Higgins
+Graneros,6106,del Libertador Gral. Bernardo O'Higgins
+Las Cabras,6107,del Libertador Gral. Bernardo O'Higgins
+Machalí,6108,del Libertador Gral. Bernardo O'Higgins
+Malloa,6109,del Libertador Gral. Bernardo O'Higgins
+Mostazal,6110,del Libertador Gral. Bernardo O'Higgins
+Olivar,6111,del Libertador Gral. Bernardo O'Higgins
+Peumo,6112,del Libertador Gral. Bernardo O'Higgins
+Pichidegua,6113,del Libertador Gral. Bernardo O'Higgins
+Quinta de Tilcoco,6114,del Libertador Gral. Bernardo O'Higgins
+Rengo,6115,del Libertador Gral. Bernardo O'Higgins
+Requínoa,6116,del Libertador Gral. Bernardo O'Higgins
+San Vicente,6117,del Libertador Gral. Bernardo O'Higgins
+Pichilemu,6201,del Libertador Gral. Bernardo O'Higgins
+La Estrella,6202,del Libertador Gral. Bernardo O'Higgins
+Litueche,6203,del Libertador Gral. Bernardo O'Higgins
+Marchihue,6204,del Libertador Gral. Bernardo O'Higgins
+Navidad,6205,del Libertador Gral. Bernardo O'Higgins
+Paredones,6206,del Libertador Gral. Bernardo O'Higgins
+San Fernando,6301,del Libertador Gral. Bernardo O'Higgins
+Chépica,6302,del Libertador Gral. Bernardo O'Higgins
+Chimbarongo,6303,del Libertador Gral. Bernardo O'Higgins
+Lolol,6304,del Libertador Gral. Bernardo O'Higgins
+Nancagua,6305,del Libertador Gral. Bernardo O'Higgins
+Palmilla,6306,del Libertador Gral. Bernardo O'Higgins
+Peralillo,6307,del Libertador Gral. Bernardo O'Higgins
+Placilla,6308,del Libertador Gral. Bernardo O'Higgins
+Pumanque,6309,del Libertador Gral. Bernardo O'Higgins
+Santa Cruz,6310,del Libertador Gral. Bernardo O'Higgins
+Talca,7101,del Maule
+Constitución,7102,del Maule
+Curepto,7103,del Maule
+Empedrado,7104,del Maule
+Maule,7105,del Maule
+Pelarco,7106,del Maule
+Pencahue,7107,del Maule
+Río Claro,7108,del Maule
+San Clemente,7109,del Maule
+San Rafael,7110,del Maule
+Cauquenes,7201,del Maule
+Chanco,7202,del Maule
+Pelluhue,7203,del Maule
+Curicó,7301,del Maule
+Hualañé,7302,del Maule
+Licantén,7303,del Maule
+Molina,7304,del Maule
+Rauco,7305,del Maule
+Romeral,7306,del Maule
+Sagrada Familia,7307,del Maule
+Teno,7308,del Maule
+Vichuquén,7309,del Maule
+Linares,7401,del Maule
+Colbún,7402,del Maule
+Longaví,7403,del Maule
+Parral,7404,del Maule
+Retiro,7405,del Maule
+San Javier,7406,del Maule
+Villa Alegre,7407,del Maule
+Yerbas Buenas,7408,del Maule
+Concepción,8101,del BíoBio
+Coronel,8102,del BíoBio
+Chiguayante,8103,del BíoBio
+Florida,8104,del BíoBio
+Hualqui,8105,del BíoBio
+Lota,8106,del BíoBio
+Penco,8107,del BíoBio
+San Pedro de la Paz,8108,del BíoBio
+Santa Juana,8109,del BíoBio
+Talcahuano,8110,del BíoBio
+Tomé,8111,del BíoBio
+Hualpén,8112,del BíoBio
+Lebu,8201,del BíoBio
+Arauco,8202,del BíoBio
+Cañete,8203,del BíoBio
+Contulmo,8204,del BíoBio
+Curanilahue,8205,del BíoBio
+Los Álamos,8206,del BíoBio
+Tirúa,8207,del BíoBio
+Los Ángeles,8301,del BíoBio
+Antuco,8302,del BíoBio
+Cabrero,8303,del BíoBio
+Laja,8304,del BíoBio
+Mulchén,8305,del BíoBio
+Nacimiento,8306,del BíoBio
+Negrete,8307,del BíoBio
+Quilaco,8308,del BíoBio
+Quilleco,8309,del BíoBio
+San Rosendo,8310,del BíoBio
+Santa Bárbara,8311,del BíoBio
+Tucapel,8312,del BíoBio
+Yumbel,8313,del BíoBio
+Alto Biobío,8314,del BíoBio
+Chillán,8401,del Ñuble
+Bulnes,8402,del Ñuble
+Cobquecura,8403,del Ñuble
+Coelemu,8404,del Ñuble
+Coihueco,8405,del Ñuble
+Chillán Viejo,8406,del Ñuble
+El Carmen,8407,del Ñuble
+Ninhue,8408,del Ñuble
+Ñiquén,8409,del Ñuble
+Pemuco,8410,del Ñuble
+Pinto,8411,del Ñuble
+Portezuelo,8412,del Ñuble
+Quillón,8413,del Ñuble
+Quirihue,8414,del Ñuble
+Ránquil,8415,del Ñuble
+San Carlos,8416,del Ñuble
+San Fabián,8417,del Ñuble
+San Ignacio,8418,del Ñuble
+San Nicolás,8419,del Ñuble
+Treguaco,8420,del Ñuble
+Yungay,8421,del Ñuble
+Temuco,9101,de la Araucania
+Carahue,9102,de la Araucania
+Cunco,9103,de la Araucania
+Curarrehue,9104,de la Araucania
+Freire,9105,de la Araucania
+Galvarino,9106,de la Araucania
+Gorbea,9107,de la Araucania
+Lautaro,9108,de la Araucania
+Loncoche,9109,de la Araucania
+Melipeuco,9110,de la Araucania
+Nueva Imperial,9111,de la Araucania
+Padre las Casas,9112,de la Araucania
+Perquenco,9113,de la Araucania
+Pitrufquén,9114,de la Araucania
+Pucón,9115,de la Araucania
+Saavedra,9116,de la Araucania
+Teodoro Schmidt,9117,de la Araucania
+Toltén,9118,de la Araucania
+Vilcún,9119,de la Araucania
+Villarrica,9120,de la Araucania
+Cholchol,9121,de la Araucania
+Angol,9201,de la Araucania
+Collipulli,9202,de la Araucania
+Curacautín,9203,de la Araucania
+Ercilla,9204,de la Araucania
+Lonquimay,9205,de la Araucania
+Los Sauces,9206,de la Araucania
+Lumaco,9207,de la Araucania
+Purén,9208,de la Araucania
+Renaico,9209,de la Araucania
+Traiguén,9210,de la Araucania
+Victoria,9211,de la Araucania
+Puerto Montt,10101,de los Lagos
+Calbuco,10102,de los Lagos
+Cochamó,10103,de los Lagos
+Fresia,10104,de los Lagos
+Frutillar,10105,de los Lagos
+Los Muermos,10106,de los Lagos
+Llanquihue,10107,de los Lagos
+Maullín,10108,de los Lagos
+Puerto Varas,10109,de los Lagos
+Castro,10201,de los Lagos
+Ancud,10202,de los Lagos
+Chonchi,10203,de los Lagos
+Curaco de Vélez,10204,de los Lagos
+Dalcahue,10205,de los Lagos
+Puqueldón,10206,de los Lagos
+Queilén,10207,de los Lagos
+Quellón,10208,de los Lagos
+Quemchi,10209,de los Lagos
+Quinchao,10210,de los Lagos
+Osorno,10301,de los Lagos
+Puerto Octay,10302,de los Lagos
+Purranque,10303,de los Lagos
+Puyehue,10304,de los Lagos
+Río Negro,10305,de los Lagos
+San Juan de la Costa,10306,de los Lagos
+San Pablo,10307,de los Lagos
+Chaitén,10401,de los Lagos
+Futaleufú,10402,de los Lagos
+Hualaihué,10403,de los Lagos
+Palena,10404,de los Lagos
+Coyhaique,11101,Aysén del Gral. Carlos Ibáñez del Campo
+Lago Verde,11102,Aysén del Gral. Carlos Ibáñez del Campo
+Aysén,11201,Aysén del Gral. Carlos Ibáñez del Campo
+Cisnes,11202,Aysén del Gral. Carlos Ibáñez del Campo
+Guaitecas,11203,Aysén del Gral. Carlos Ibáñez del Campo
+Cochrane,11301,Aysén del Gral. Carlos Ibáñez del Campo
+O'Higgins,11302,Aysén del Gral. Carlos Ibáñez del Campo
+Tortel,11303,Aysén del Gral. Carlos Ibáñez del Campo
+Chile Chico,11401,Aysén del Gral. Carlos Ibáñez del Campo
+Río Ibáñez,11402,Aysén del Gral. Carlos Ibáñez del Campo
+Punta Arenas,12101,Magallanes
+Laguna Blanca,12102,Magallanes
+Río Verde,12103,Magallanes
+San Gregorio,12104,Magallanes
+Cabo de Hornos,12201,Magallanes
+Antártica,12202,Magallanes
+Porvenir,12301,Magallanes
+Primavera,12302,Magallanes
+Timaukel,12303,Magallanes
+Natales,12401,Magallanes
+Torres del Paine,12402,Magallanes
+Santiago,13101,Metropolitana
+Cerrillos,13102,Metropolitana
+Cerro Navia,13103,Metropolitana
+Conchalí,13104,Metropolitana
+El Bosque,13105,Metropolitana
+Estación Central,13106,Metropolitana
+Huechuraba,13107,Metropolitana
+Independencia,13108,Metropolitana
+La Cisterna,13109,Metropolitana
+La Florida,13110,Metropolitana
+La Granja,13111,Metropolitana
+La Pintana,13112,Metropolitana
+La Reina,13113,Metropolitana
+Las Condes,13114,Metropolitana
+Lo Barnechea,13115,Metropolitana
+Lo Espejo,13116,Metropolitana
+Lo Prado,13117,Metropolitana
+Macul,13118,Metropolitana
+Maipú,13119,Metropolitana
+Ñuñoa,13120,Metropolitana
+Pedro Aguirre Cerda,13121,Metropolitana
+Peñalolén,13122,Metropolitana
+Providencia,13123,Metropolitana
+Pudahuel,13124,Metropolitana
+Quilicura,13125,Metropolitana
+Quinta Normal,13126,Metropolitana
+Recoleta,13127,Metropolitana
+Renca,13128,Metropolitana
+San Joaquín,13129,Metropolitana
+San Miguel,13130,Metropolitana
+San Ramón,13131,Metropolitana
+Vitacura,13132,Metropolitana
+Puente Alto,13201,Metropolitana
+Pirque,13202,Metropolitana
+San José de Maipo,13203,Metropolitana
+Colina,13301,Metropolitana
+Lampa,13302,Metropolitana
+Tiltil,13303,Metropolitana
+San Bernardo,13401,Metropolitana
+Buin,13402,Metropolitana
+Calera de Tango,13403,Metropolitana
+Paine,13404,Metropolitana
+Melipilla,13501,Metropolitana
+Alhué,13502,Metropolitana
+Curacaví,13503,Metropolitana
+María Pinto,13504,Metropolitana
+San Pedro,13505,Metropolitana
+Talagante,13601,Metropolitana
+El Monte,13602,Metropolitana
+Isla de Maipo,13603,Metropolitana
+Padre Hurtado,13604,Metropolitana
+Peñaflor,13605,Metropolitana
+Valdivia,14101,Los Ríos
+Corral,14102,Los Ríos
+Lanco,14103,Los Ríos
+Los Lagos,14104,Los Ríos
+Máfil,14105,Los Ríos
+Mariquina,14106,Los Ríos
+Paillaco,14107,Los Ríos
+Panguipulli,14108,Los Ríos
+La Unión,14201,Los Ríos
+Futrono,14202,Los Ríos
+Lago Ranco,14203,Los Ríos
+Río Bueno,14204,Los Ríos
+Arica,15101,Arica y Parinacota
+Camarones,15102,Arica y Parinacota
+Putre,15201,Arica y Parinacota
+General Lagos,15202,Arica y Parinacota

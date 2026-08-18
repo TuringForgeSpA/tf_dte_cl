@@ -22,7 +22,6 @@
         'data/account_edi_data.xml',
         'data/tf_dte_cl_cron.xml',
         'data/account_move_docs_sii.csv',
-        'data/res_comuna.csv',
         'views/account_journal_views.xml',
         'views/config_dte_views.xml',
         'views/xml_envio_views.xml',
@@ -38,4 +37,5 @@
     ],
     'installable': True,
     'application': False,
+    'post_init_hook': '_cargar_comunas',
 }
