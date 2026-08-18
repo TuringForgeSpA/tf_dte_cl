@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
+import ast
 import base64
 import collections
 import logging
 from io import BytesIO
 
+from lxml import etree
 from PIL import Image
 
 from odoo import _, models
@@ -49,6 +51,49 @@ DTE_CODES_SOPORTADOS = DTE_CODES_FACTURACION + DTE_CODES_BOLETA
 # documento. 60803000-K es el RUT del propio SII. Valor heredado tal cual
 # del módulo antiguo (enviar_dte/crear_dte).
 RUT_RECEPTOR_ENVIO = '60803000-K'
+
+# ==========================================================
+# ESTADOS NORMALIZADOS
+# ==========================================================
+# Únicos cuatro valores que _l10n_cl_query_dte_status puede devolver y
+# que _l10n_cl_update_dte_status sabe traducir al vocabulario del
+# framework EDI. Cualquier otro string del SII se normaliza a uno de
+# estos o, si no se reconoce, a EnProceso (conservador: se vuelve a
+# consultar en el siguiente cron en vez de dar por cerrado el documento).
+ESTADO_ACEPTADO = 'Aceptado'
+ESTADO_RECHAZADO = 'Rechazado'
+ESTADO_REPARO = 'Reparo'
+ESTADO_EN_PROCESO = 'EnProceso'
+
+# Códigos que devuelve el webservice de consulta de estado de envío del
+# SII (campo ESTADO de la respuesta de QueryEstUp) y sus equivalentes en
+# texto que a veces entrega la librería en response['status'].
+# OJO: cuando el sobre ya fue procesado, mandan los CONTADORES
+# (ACEPTADOS/RECHAZADOS/REPAROS), no este código; ver
+# _l10n_cl_classify_estado. Revisar esta tabla contra la documentación
+# vigente del SII si aparecen estados sin reconocer en el log.
+SII_ESTADO_ACEPTADO = {'EPR', 'DOK', 'MMC', 'TMC', 'AND', 'ANC', 'ACEPTADO'}
+SII_ESTADO_REPARO = {'DNK', 'RPR', 'REPARO', 'CONREPARO', 'ACEPTADOCONREPARO', 'ACEPTADOCONREPAROS'}
+SII_ESTADO_RECHAZADO = {
+    'RCT', 'RCH', 'RFR', 'RSC', 'RPT', 'RFP', 'SNC', 'FNA', 'FAU', 'FAN',
+    'LRH', 'RCR', 'RDC', 'VOF', 'RECHAZADO',
+}
+SII_ESTADO_EN_PROCESO = {
+    'SOK', 'CRT', 'PDR', 'FOK', 'LOK', 'PRD', '0', 'ENPROCESO', 'PROCESO',
+    'ENVIADO', 'RECIBIDO',
+}
+
+# Traducción del estado normalizado al Selection de xml.envio (registro
+# de auditoría). NOTA: xml.envio.ESTADOS no contempla "Reparo"; hasta que
+# se agregue esa opción en xml_envio.py, un DTE aceptado con reparos se
+# refleja como Aceptado en la auditoría (legalmente lo está) y el detalle
+# queda en sii_receipt / move.detalle_estado.
+XML_ENVIO_STATE_MAP = {
+    ESTADO_ACEPTADO: 'Aceptado',
+    ESTADO_RECHAZADO: 'Rechazado',
+    ESTADO_REPARO: 'Aceptado',
+    ESTADO_EN_PROCESO: 'EnProceso',
+}
 
 
 class SiiEdiError(Exception):
@@ -303,7 +348,10 @@ class AccountEdiFormat(models.Model):
             ('edi_format_id', '=', edi_format.id),
             ('state', '=', 'sent'),
             ('move_id.track_id', '!=', False),
-            ('move_id.estado_dte', 'not in', ['Aceptado', 'Rechazado']),
+            # Aceptado / Rechazado / Reparo son respuestas DEFINITIVAS del
+            # SII: si no se excluye Reparo, esos documentos se seguirían
+            # consultando indefinidamente en cada pasada del cron.
+            ('move_id.estado_dte', 'not in', [ESTADO_ACEPTADO, ESTADO_RECHAZADO, ESTADO_REPARO]),
         ])
         for document in documents:
             edi_format._l10n_cl_update_dte_status(document)
@@ -311,23 +359,55 @@ class AccountEdiFormat(models.Model):
     def _l10n_cl_update_dte_status(self, document):
         """Consulta el estado de UN account.edi.document contra el SII
         (usando move.track_id) y lo traduce al vocabulario del framework.
+
+        Nunca propaga excepciones: se ejecuta desde un cron sobre un lote
+        de documentos y un SII caído no debe abortar la pasada completa.
         """
         self.ensure_one()
         move = document.move_id
         cod_dte = move.journal_id.cod_dte
 
-        estado, glosa = self._l10n_cl_query_dte_status(move, cod_dte)
+        try:
+            estado, glosa = self._l10n_cl_query_dte_status(move, cod_dte)
+        except SiiEdiError as error:
+            if error.blocking_level == 'error':
+                # Problema que no se resuelve solo (firma, Track ID
+                # inválido, configuración): se refleja en el banner.
+                document.write({'error': error.message, 'blocking_level': 'error'})
+            else:
+                # Transitorio (5xx, timeout, sin respuesta): se reintenta
+                # en la próxima pasada sin ensuciar la factura.
+                _logger.info("No se pudo consultar el estado de %s: %s", move.name, error.message)
+            return
+        except Exception:
+            _logger.exception("Error inesperado consultando el estado del DTE %s", move.name)
+            return
 
-        move.write({
-            'estado_dte': estado,
-            'detalle_estado': glosa,
-        })
+        vals = {}
+        if move.estado_dte != estado:
+            vals['estado_dte'] = estado
+        if move.detalle_estado != glosa:
+            vals['detalle_estado'] = glosa
+        if vals:
+            move.write(vals)
 
-        if estado == 'Rechazado':
-            document.write({'error': glosa, 'blocking_level': 'error'})
-        elif estado == 'Reparo':
-            document.write({'error': glosa, 'blocking_level': 'warning'})
-        elif estado == 'Aceptado':
+        if move.xml_envio_id:
+            xml_vals = {'state': XML_ENVIO_STATE_MAP.get(estado, 'EnProceso')}
+            if glosa:
+                xml_vals['sii_receipt'] = glosa
+            move.xml_envio_id.write(xml_vals)
+
+        if estado == ESTADO_RECHAZADO:
+            document.write({
+                'error': glosa or _("El SII rechazó el DTE."),
+                'blocking_level': 'error',
+            })
+        elif estado == ESTADO_REPARO:
+            document.write({
+                'error': glosa or _("El SII aceptó el DTE con reparos."),
+                'blocking_level': 'warning',
+            })
+        elif estado == ESTADO_ACEPTADO:
             document.write({'error': False, 'blocking_level': False})
         # si sigue "EnProceso" no se toca el account.edi.document: se reintenta después
 
@@ -540,14 +620,217 @@ class AccountEdiFormat(models.Model):
         }
 
     def _l10n_cl_query_dte_status(self, move, cod_dte):
-        """Llama a fe.consulta_estado_dte / fe.consulta_estado_documento y
-        devuelve (estado, glosa) normalizado.
+        """Consulta el Track ID contra el SII y devuelve una tupla
+        (estado, glosa) NORMALIZADA, donde estado es estrictamente uno de
+        'Aceptado' / 'Rechazado' / 'Reparo' / 'EnProceso'.
 
-        Pendiente a propósito: no se mezcla la consulta de estado con la
-        corrección del envío.
+        Migrado de consulta_estado_dte() de account.move, que mezclaba la
+        consulta con la escritura de campos; acá la consulta es pura
+        (salvo la copia del XML crudo al registro de auditoría) y quien
+        decide qué hacer con el resultado es _l10n_cl_update_dte_status.
+
+        Igual que en el módulo antiguo, el webservice depende del tipo:
+          - Boletas (39/41): fe.consulta_estado_documento(), que además
+            necesita el 'Documento' completo en el payload.
+          - Resto: fe.consulta_estado_dte().
+
+        Los errores de red/HTTP los clasifica _l10n_cl_call_fe y viajan
+        como SiiEdiError (5xx/timeout -> 'warning' y se reintenta;
+        4xx/firma -> 'error' y se muestra en el banner).
         """
         self.ensure_one()
-        raise NotImplementedError(_("Falta migrar la consulta de estado del DTE."))
+
+        conf = move.journal_id.config_dte_id
+        if not conf:
+            raise SiiEdiError(
+                _("El diario '%s' no tiene configuración DTE: no es posible consultar el estado.")
+                % move.journal_id.name,
+                'error',
+            )
+        if not move.track_id:
+            # Sin Track ID no hay nada que consultar: el documento sigue
+            # pendiente de envío, no es un error del SII.
+            return ESTADO_EN_PROCESO, _("El documento todavía no tiene Track ID asignado.")
+
+        data = collections.OrderedDict()
+        data['Emisor'] = move.data_emisor(conf)
+        data['firma_electronica'] = move.data_firma_electronica(conf)
+        data['codigo_envio'] = move.track_id
+
+        if cod_dte in DTE_CODES_BOLETA:
+            # consulta_estado_documento necesita el detalle del documento
+            # para reconstruir la clave de consulta (tal como lo hacía
+            # consulta_estado_dte() en el módulo antiguo).
+            data['Documento'] = move.data_documento(move, conf, cod_dte)
+            response = self._l10n_cl_call_fe(move, 'consulta_estado_documento', data)
+            estado, glosa, raw_response = self._l10n_cl_parse_boleta_status(move, response)
+        else:
+            response = self._l10n_cl_call_fe(move, 'consulta_estado_dte', data)
+            estado, glosa, raw_response = self._l10n_cl_parse_dte_status(move, response)
+
+        # Se conserva la respuesta cruda en el registro de auditoría, como
+        # hacía el write de sii_xml_response del módulo antiguo.
+        if raw_response and move.xml_envio_id:
+            move.xml_envio_id.write({'sii_xml_response': raw_response})
+
+        _logger.info("Estado SII de %s (Track ID %s): %s", move.name, move.track_id, estado)
+        return estado, glosa
+
+    def _l10n_cl_parse_dte_status(self, move, response):
+        """Parsea la respuesta de fe.consulta_estado_dte().
+
+        Migrado de procesar_respuesta_xml(): lee ESTADO, GLOSA y los
+        contadores ACEPTADOS / RECHAZADOS / REPAROS del XML de respuesta.
+
+        Devuelve (estado_normalizado, glosa, xml_crudo).
+        """
+        self.ensure_one()
+        if not isinstance(response, dict):
+            return ESTADO_EN_PROCESO, _("Respuesta inesperada del SII al consultar el estado."), ''
+
+        raw_response = response.get('xml_resp') or ''
+        estado_sii = (response.get('status') or '').strip()
+        glosa_sii = ''
+        contadores = {'ACEPTADOS': 0, 'RECHAZADOS': 0, 'REPAROS': 0}
+
+        if raw_response:
+            try:
+                xml_bytes = raw_response.encode('utf-8') if isinstance(raw_response, str) else raw_response
+                root = etree.fromstring(xml_bytes)
+                for element in root.iter():
+                    if not isinstance(element.tag, str):  # comentarios / PIs
+                        continue
+                    tag = etree.QName(element).localname  # tolera namespaces
+                    text = (element.text or '').strip()
+                    if not text:
+                        continue
+                    if tag == 'ESTADO':
+                        estado_sii = text
+                    elif tag == 'GLOSA':
+                        glosa_sii = text
+                    elif tag in contadores:
+                        try:
+                            contadores[tag] = int(text)
+                        except ValueError:
+                            contadores[tag] = 0
+            except etree.XMLSyntaxError:
+                _logger.warning(
+                    "No se pudo parsear la respuesta de estado del SII para %s: %s",
+                    move.name, raw_response[:500],
+                )
+
+        estado = self._l10n_cl_classify_estado(estado_sii, contadores)
+        glosa = self._l10n_cl_build_glosa(estado_sii, glosa_sii, contadores)
+        return estado, glosa, raw_response
+
+    def _l10n_cl_parse_boleta_status(self, move, response):
+        """Parsea la respuesta de fe.consulta_estado_documento().
+
+        Migrado de procesar_respuesta_boleta(): la librería devuelve un
+        dict indexado por el nombre del envío ('T<tipo>F<folio>', el mismo
+        que se guarda en xml.envio.name), y dentro trae 'status', 'glosa'
+        y un 'xml_resp' que es un dict serializado como texto con
+        'codigo' y 'descripcion'.
+
+        Devuelve (estado_normalizado, glosa, respuesta_cruda).
+        """
+        self.ensure_one()
+        if not isinstance(response, dict):
+            return ESTADO_EN_PROCESO, _("Respuesta inesperada del SII al consultar la boleta."), ''
+
+        clave = move.xml_envio_id.name if move.xml_envio_id else False
+        detalle = response.get(clave) if clave else None
+        if not isinstance(detalle, dict):
+            # Si la clave no calza (envío regenerado, nombre distinto),
+            # se acepta la respuesta cuando trae un único documento.
+            candidatos = [v for v in response.values() if isinstance(v, dict)]
+            detalle = candidatos[0] if len(candidatos) == 1 else None
+        if not isinstance(detalle, dict):
+            _logger.info("El SII no devolvió detalle para la boleta %s (clave '%s').", move.name, clave)
+            return ESTADO_EN_PROCESO, _("El SII todavía no informa el estado de este documento."), ''
+
+        estado_sii = (detalle.get('status') or '').strip()
+        glosa_sii = (detalle.get('glosa') or '').strip()
+        raw_response = detalle.get('xml_resp') or ''
+
+        codigo = ''
+        descripcion = ''
+        if raw_response:
+            try:
+                parsed = ast.literal_eval(raw_response) if isinstance(raw_response, str) else raw_response
+                if isinstance(parsed, dict):
+                    codigo = str(parsed.get('codigo') or '').strip()
+                    descripcion = str(parsed.get('descripcion') or '').strip()
+            except (ValueError, SyntaxError):
+                _logger.warning(
+                    "No se pudo interpretar xml_resp de la boleta %s: %s", move.name, str(raw_response)[:500]
+                )
+
+        estado = self._l10n_cl_classify_estado(estado_sii, {})
+        # Si el status no es concluyente pero el SII ya entregó un código
+        # de recepción distinto de 0 (1 schema, 2 firma, 3 RUT receptor,
+        # 90 archivo repetido...), el documento está rechazado.
+        if estado == ESTADO_EN_PROCESO and not estado_sii and codigo and codigo != '0':
+            estado = ESTADO_RECHAZADO
+
+        partes = [p for p in (estado_sii, glosa_sii, codigo and ' - '.join(filter(None, (codigo, descripcion)))) if p]
+        glosa = ' - '.join(partes) or _("Sin detalle informado por el SII.")
+        return estado, glosa, str(raw_response)
+
+    def _l10n_cl_classify_estado(self, estado_sii, contadores):
+        """Normaliza el estado crudo del SII a uno de los cuatro valores
+        que entiende el framework EDI.
+
+        Prioridad: los CONTADORES mandan sobre el código de estado. Una
+        vez que el sobre fue procesado (ESTADO=EPR), quien dice si el DTE
+        quedó aceptado, con reparos o rechazado es el desglose
+        ACEPTADOS/RECHAZADOS/REPAROS, no el estado del envío.
+
+        Ante un código desconocido devuelve EnProceso a propósito: es
+        preferible volver a consultar en la siguiente pasada del cron
+        antes que marcar como aceptado o rechazado algo que no se
+        entendió.
+        """
+        self.ensure_one()
+        contadores = contadores or {}
+        if contadores.get('RECHAZADOS'):
+            return ESTADO_RECHAZADO
+        if contadores.get('REPAROS'):
+            return ESTADO_REPARO
+        if contadores.get('ACEPTADOS'):
+            return ESTADO_ACEPTADO
+
+        codigo = (estado_sii or '').strip().upper().replace(' ', '').replace('_', '')
+        if not codigo:
+            return ESTADO_EN_PROCESO
+        if codigo in SII_ESTADO_RECHAZADO:
+            return ESTADO_RECHAZADO
+        if codigo in SII_ESTADO_REPARO:
+            return ESTADO_REPARO
+        if codigo in SII_ESTADO_ACEPTADO:
+            return ESTADO_ACEPTADO
+        if codigo in SII_ESTADO_EN_PROCESO:
+            return ESTADO_EN_PROCESO
+
+        _logger.warning(
+            "Estado del SII no reconocido: '%s'. Se mantiene EnProceso; "
+            "considere agregarlo a las tablas SII_ESTADO_*.", estado_sii,
+        )
+        return ESTADO_EN_PROCESO
+
+    def _l10n_cl_build_glosa(self, estado_sii, glosa_sii, contadores):
+        """Arma el texto legible que va a move.detalle_estado y al banner.
+        Equivale al string que devolvía procesar_respuesta_xml().
+        """
+        self.ensure_one()
+        partes = [p for p in (estado_sii, glosa_sii) if p]
+        if contadores and any(contadores.values()):
+            partes.append(_("Aceptados: %(ok)s, Rechazados: %(ko)s, Reparos: %(rep)s") % {
+                'ok': contadores.get('ACEPTADOS', 0),
+                'ko': contadores.get('RECHAZADOS', 0),
+                'rep': contadores.get('REPAROS', 0),
+            })
+        return ' - '.join(partes) or _("Sin detalle informado por el SII.")
 
     def _l10n_cl_create_dte_attachment(self, move, response, cod_dte):
         """Crea el ir.attachment estándar (lo que el framework espera en
