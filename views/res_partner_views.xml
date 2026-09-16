@@ -1,31 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: views/res_partner_views.xml -->
 <odoo>
 
     <record id="view_partner_form_tf_dte_cl" model="ir.ui.view">
-        <field name="name">res.partner.form.tf.dte.cl</field>
+        <field name="name">res.partner.form.tf_dte_cl</field>
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
-            <field name="city" position="after">
-                <field name="comuna_id" placeholder="Comuna"/>
-            </field>
-            <field name="vat" position="after">
-                <field name="giro" placeholder="Giro"/>
-            </field>
-            <xpath expr="//field[@name='category_id']" position="after">
-                <field name="transportista"/>
+            <!-- Dirección principal (base/views/res_partner_views.xml, Odoo 18) -->
+            <xpath expr="/form/sheet/group//div[hasclass('o_address_format')]/field[@name='state_id']" position="after">
+                <field name="tf_dte_cl_comuna_id" class="o_address_city" placeholder="Comuna"
+                       options="{'no_open': True, 'no_create': True}"
+                       readonly="type == 'contact' and parent_id"/>
             </xpath>
-        </field>
-    </record>
-
-    <record id="view_partner_tree_tf_dte_cl" model="ir.ui.view">
-        <field name="name">res.partner.tree.tf.dte.cl</field>
-        <field name="model">res.partner</field>
-        <field name="inherit_id" ref="base.view_partner_tree"/>
-        <field name="arch" type="xml">
-            <field name="display_name" position="after">
-                <field name="giro" optional="hide"/>
-            </field>
+            <!-- Direcciones hijas (facturación / despacho) -->
+            <xpath expr="//field[@name='child_ids']/form//div[@name='div_address']/field[@name='state_id']" position="after">
+                <field name="tf_dte_cl_comuna_id" class="o_address_city" placeholder="Comuna"
+                       options="{'no_open': True, 'no_create': True}"/>
+            </xpath>
+            <xpath expr="/form/sheet/group//field[@name='vat']" position="after">
+                <field name="tf_dte_cl_giro" placeholder="Giro comercial" readonly="parent_id"/>
+                <field name="tf_dte_cl_dte_email" widget="email" readonly="parent_id"/>
+            </xpath>
+            <xpath expr="/form/sheet/group//field[@name='category_id']" position="after">
+                <field name="tf_dte_cl_is_carrier"/>
+            </xpath>
         </field>
     </record>
 

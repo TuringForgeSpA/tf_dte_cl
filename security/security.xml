@@ -1,51 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: security/security.xml -->
 <odoo>
 
-    <record id="group_dte_manager" model="res.groups">
-        <field name="name">DTE / Puede restablecer documentos electrónicos</field>
+    <record id="group_tf_dte_cl_manager" model="res.groups">
+        <field name="name">DTE: puede restablecer documentos electrónicos</field>
         <field name="category_id" ref="base.module_category_accounting_accounting"/>
         <field name="comment">
-            Permite restablecer el estado de un DTE (factura, nota o guía) que ya
-            cuenta con un sobre de envío ante el SII. Esta es una operación sensible:
-            solo debe usarse cuando el SII confirma que un documento fue rechazado
-            y se necesita reintentar con un folio nuevo.
+            Permite restablecer un DTE rechazado por el SII para volver a emitirlo.
+            Los documentos aceptados o aceptados con reparos nunca se restablecen.
         </field>
     </record>
 
-    <record id="rule_account_move_no_delete_dte" model="ir.rule">
-        <field name="name">DTE: no eliminar facturas con trámite ante el SII</field>
-        <field name="model_id" ref="account.model_account_move"/>
-        <field name="domain_force">
-            [('estado_dte', 'not in', ['Aceptado', 'Reparo', 'Rechazado'])]
-        </field>
-        <field name="perm_unlink">1</field>
-        <field name="perm_read">0</field>
-        <field name="perm_write">0</field>
-        <field name="perm_create">0</field>
+    <record id="rule_tf_dte_cl_branch_company" model="ir.rule">
+        <field name="name">Sucursal SII: multicompañía</field>
+        <field name="model_id" ref="model_tf_dte_cl_branch"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
     </record>
 
-    <record id="rule_stock_picking_no_delete_dte" model="ir.rule">
-        <field name="name">DTE: no eliminar guías con trámite ante el SII</field>
-        <field name="model_id" ref="stock.model_stock_picking"/>
-        <field name="domain_force">
-            [('estado_dte', 'not in', ['Aceptado', 'Reparo', 'Rechazado'])]
-        </field>
-        <field name="perm_unlink">1</field>
-        <field name="perm_read">0</field>
-        <field name="perm_write">0</field>
-        <field name="perm_create">0</field>
+    <record id="rule_tf_dte_cl_certificate_company" model="ir.rule">
+        <field name="name">Certificado digital: multicompañía</field>
+        <field name="model_id" ref="model_tf_dte_cl_certificate"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
     </record>
 
-    <record id="rule_xml_envio_no_delete_dte" model="ir.rule">
-        <field name="name">DTE: no eliminar sobres de envío válidos ante el SII</field>
-        <field name="model_id" ref="model_xml_envio"/>
-        <field name="domain_force">
-            [('state', 'not in', ['Aceptado', 'Reparo', 'Enviado', 'EnProceso', 'Proceso'])]
-        </field>
-        <field name="perm_unlink">1</field>
-        <field name="perm_read">0</field>
-        <field name="perm_write">0</field>
-        <field name="perm_create">0</field>
+    <record id="rule_tf_dte_cl_certificate_load_company" model="ir.rule">
+        <field name="name">Carga de certificado: multicompañía</field>
+        <field name="model_id" ref="model_tf_dte_cl_certificate_load"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="rule_tf_dte_cl_caf_company" model="ir.rule">
+        <field name="name">CAF: multicompañía</field>
+        <field name="model_id" ref="model_tf_dte_cl_caf"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="rule_tf_dte_cl_caf_void_company" model="ir.rule">
+        <field name="name">Folios por anular: multicompañía</field>
+        <field name="model_id" ref="model_tf_dte_cl_caf_void"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_tf_dte_cl_envelope_company" model="ir.rule">
+        <field name="name">Sobre EnvioDTE: multicompañía</field>
+        <field name="model_id" ref="model_tf_dte_cl_envelope"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="rule_tf_dte_cl_envelope_attempt_company" model="ir.rule">
+        <field name="name">Intento de envío: multicompañía</field>
+        <field name="model_id" ref="model_tf_dte_cl_envelope_attempt"/>
+        <field name="domain_force">[('envelope_id.company_id', 'in', company_ids)]</field>
     </record>
 
 </odoo>

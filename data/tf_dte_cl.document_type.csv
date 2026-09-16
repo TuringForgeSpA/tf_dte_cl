@@ -1,0 +1,43 @@
+id,code,name,kind,is_electronic,active
+document_type_30,30,Factura,tax,False,True
+document_type_32,32,Factura de venta de bienes y servicios no afectos o exentos de IVA,tax,False,True
+document_type_33,33,Factura electrónica,tax,True,True
+document_type_34,34,Factura no afecta o exenta electrónica,tax,True,True
+document_type_35,35,Boleta,tax,False,False
+document_type_38,38,Boleta exenta,tax,False,False
+document_type_39,39,Boleta electrónica,tax,True,False
+document_type_40,40,Liquidación factura,tax,False,False
+document_type_41,41,Boleta exenta electrónica,tax,True,False
+document_type_43,43,Liquidación-factura electrónica,tax,True,False
+document_type_45,45,Factura de compra,tax,False,False
+document_type_46,46,Factura de compra electrónica,tax,True,False
+document_type_48,48,Comprobante de pago electrónico,tax,True,True
+document_type_50,50,Guía de despacho,tax,False,True
+document_type_52,52,Guía de despacho electrónica,tax,True,True
+document_type_55,55,Nota de débito,tax,False,True
+document_type_56,56,Nota de débito electrónica,tax,True,True
+document_type_60,60,Nota de crédito,tax,False,True
+document_type_61,61,Nota de crédito electrónica,tax,True,True
+document_type_103,103,Liquidación,tax,False,False
+document_type_110,110,Factura de exportación electrónica,tax,True,False
+document_type_111,111,Nota de débito de exportación electrónica,tax,True,False
+document_type_112,112,Nota de crédito de exportación electrónica,tax,True,False
+document_type_801,801,Orden de compra,other,False,True
+document_type_802,802,Nota de pedido,other,False,True
+document_type_803,803,Contrato,other,False,True
+document_type_804,804,Resolución,other,False,True
+document_type_805,805,Proceso ChileCompra,other,False,True
+document_type_806,806,Ficha ChileCompra,other,False,True
+document_type_807,807,DUS,other,False,True
+document_type_808,808,B/L (conocimiento de embarque),other,False,True
+document_type_809,809,AWB (Air Waybill),other,False,True
+document_type_810,810,MIC/DTA,other,False,True
+document_type_811,811,Carta de porte,other,False,True
+document_type_812,812,Resolución del SNA donde califica servicios de exportación,other,False,True
+document_type_813,813,Pasaporte,other,False,True
+document_type_814,814,Certificado de depósito Bolsa de Productos de Chile,other,False,True
+document_type_815,815,Vale de prenda Bolsa de Productos de Chile,other,False,True
+document_type_820,820,Código de inscripción en el Registro de Acuerdos con Plazo de Pago Excepcional,other,False,True
+document_type_821,821,Georreferencia predio,other,False,True
+document_type_822,822,ROL avalúo predio,other,False,True
+document_type_823,823,Plan de manejo CONAF,other,False,True

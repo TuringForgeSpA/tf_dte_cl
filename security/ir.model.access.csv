@@ -1,14 +1,22 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_account_move_docs_sii,account.move.docs.sii,model_account_move_docs_sii,account.group_account_invoice,1,0,0,0
-access_account_move_docs_sii_manager,account.move.docs.sii manager,model_account_move_docs_sii,account.group_account_manager,1,1,1,1
-access_account_move_referencia,account.move.referencia,model_account_move_referencia,account.group_account_invoice,1,1,1,1
-access_xml_envio,xml.envio,model_xml_envio,account.group_account_invoice,1,1,1,0
-access_xml_envio_manager,xml.envio manager,model_xml_envio,account.group_account_manager,1,1,1,1
-access_config_dte,config.dte,model_config_dte,account.group_account_invoice,1,0,0,0
-access_config_dte_manager,config.dte manager,model_config_dte,account.group_account_manager,1,1,1,1
-access_config_dte_caf,config.dte.caf,model_config_dte_caf,account.group_account_manager,1,1,1,1
-access_config_sucursales,config.sucursales,model_config_sucursales,account.group_account_invoice,1,0,0,0
-access_config_sucursales_manager,config.sucursales manager,model_config_sucursales,account.group_account_manager,1,1,1,1
-access_actecos_dte,actecos.dte,model_actecos_dte,account.group_account_manager,1,1,1,1
-access_sii_firma,sii.firma,model_sii_firma,account.group_account_manager,1,1,1,1
-access_tf_dte_builder_mixin,tf.dte.builder.mixin,model_tf_dte_builder_mixin,base.group_user,1,0,0,0
+access_tf_dte_cl_comuna_user,tf_dte_cl.comuna user,model_tf_dte_cl_comuna,base.group_user,1,0,0,0
+access_tf_dte_cl_comuna_system,tf_dte_cl.comuna system,model_tf_dte_cl_comuna,base.group_system,1,1,1,1
+access_tf_dte_cl_activity_user,tf_dte_cl.activity user,model_tf_dte_cl_activity,base.group_user,1,0,0,0
+access_tf_dte_cl_activity_manager,tf_dte_cl.activity manager,model_tf_dte_cl_activity,account.group_account_manager,1,1,1,1
+access_tf_dte_cl_branch_user,tf_dte_cl.branch user,model_tf_dte_cl_branch,base.group_user,1,0,0,0
+access_tf_dte_cl_branch_manager,tf_dte_cl.branch manager,model_tf_dte_cl_branch,account.group_account_manager,1,1,1,1
+access_tf_dte_cl_certificate_manager,tf_dte_cl.certificate manager,model_tf_dte_cl_certificate,account.group_account_manager,1,1,0,1
+access_tf_dte_cl_certificate_load_manager,tf_dte_cl.certificate.load manager,model_tf_dte_cl_certificate_load,account.group_account_manager,1,1,1,1
+access_tf_dte_cl_caf_user,tf_dte_cl.caf user,model_tf_dte_cl_caf,account.group_account_invoice,1,0,0,0
+access_tf_dte_cl_caf_stock,tf_dte_cl.caf stock,model_tf_dte_cl_caf,stock.group_stock_user,1,0,0,0
+access_tf_dte_cl_caf_manager,tf_dte_cl.caf manager,model_tf_dte_cl_caf,account.group_account_manager,1,1,1,1
+access_tf_dte_cl_caf_void_user,tf_dte_cl.caf.void user,model_tf_dte_cl_caf_void,account.group_account_invoice,1,0,0,0
+access_tf_dte_cl_caf_void_manager,tf_dte_cl.caf.void manager,model_tf_dte_cl_caf_void,account.group_account_manager,1,1,0,0
+access_tf_dte_cl_document_type_user,tf_dte_cl.document_type user,model_tf_dte_cl_document_type,base.group_user,1,0,0,0
+access_tf_dte_cl_document_type_manager,tf_dte_cl.document_type manager,model_tf_dte_cl_document_type,account.group_account_manager,1,1,1,0
+access_tf_dte_cl_reference_invoice,tf_dte_cl.reference invoice,model_tf_dte_cl_reference,account.group_account_invoice,1,1,1,1
+access_tf_dte_cl_reference_stock,tf_dte_cl.reference stock,model_tf_dte_cl_reference,stock.group_stock_user,1,1,1,1
+access_tf_dte_cl_envelope_invoice,tf_dte_cl.envelope invoice,model_tf_dte_cl_envelope,account.group_account_invoice,1,0,0,0
+access_tf_dte_cl_envelope_stock,tf_dte_cl.envelope stock,model_tf_dte_cl_envelope,stock.group_stock_user,1,0,0,0
+access_tf_dte_cl_envelope_attempt_invoice,tf_dte_cl.envelope.attempt invoice,model_tf_dte_cl_envelope_attempt,account.group_account_invoice,1,0,0,0
+access_tf_dte_cl_envelope_attempt_stock,tf_dte_cl.envelope.attempt stock,model_tf_dte_cl_envelope_attempt,stock.group_stock_user,1,0,0,0

@@ -1,3 +1,3 @@
 from . import controllers
 from . import models
-from .hooks import _cargar_comunas
+from .hooks import _tf_dte_cl_load_comunas

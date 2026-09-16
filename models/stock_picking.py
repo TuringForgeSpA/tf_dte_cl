@@ -1,405 +1,295 @@
 # -*- coding: utf-8 -*-
-import collections
-import logging
+"""Guía de despacho electrónica (52).
 
-from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+Ruta real: models/stock_picking.py
 
-_logger = logging.getLogger(__name__)
+Fuentes: SII, "Formato Documentos Tributarios Electrónicos" v2.4.2
+(IdDoc: TipoDespacho, IndTraslado, TpoImpresion; zona Transporte) y
+facturacion_electronica 0.24.0 (documento.py, Transporte).
 
-try:
-    from facturacion_electronica import facturacion_electronica as fe
-except ImportError:
-    fe = None
-    _logger.warning(
-        'No se pudo importar la librería "facturacion_electronica". '
-        'Instálela con: pip install facturacion_electronica'
-    )
+Criterios tf_dte_cl:
+* Todas las guías van valorizadas: precio de la línea de venta, si no el precio
+  de lista del producto y, en último caso, 1 (se deja constancia en el chatter).
+* Los indicadores de traslado 7, 8 y 9 corresponden a exportación y quedan
+  fuera del alcance.
+* En un traslado interno sin contacto, el receptor es la propia compañía.
+"""
+from __future__ import annotations
 
-LISTA_DTE_GUIA = [('52', 'Guía de despacho electrónica (52)')]
+from odoo import api, fields, models
+from odoo.exceptions import UserError, ValidationError
 
-LISTA_DESPACHO = [
-    ('1', 'Por cuenta del receptor del documento (cliente)'),
-    ('2', 'Por cuenta del emisor a instalaciones del cliente'),
-    ('3', 'Por cuenta del emisor a otras instalaciones'),
-]
+from .dte_lines import LineInfo, build_detail, iva_rate, line_errors, split_amounts
+from .res_partner import is_valid_rut, normalize_rut
 
-LISTA_TRASLADO = [
+GUIDE_DTE_TYPE = '52'
+PICKING_CODES = ('outgoing', 'internal')
+
+TRANSFER_TYPES = [
     ('1', 'Operación constituye venta'),
     ('2', 'Ventas por efectuar'),
     ('3', 'Consignaciones'),
     ('4', 'Entrega gratuita'),
-    ('5', 'Traslados internos'),
+    ('5', 'Traslado interno'),
     ('6', 'Otros traslados no venta'),
-    ('7', 'Guía de devolución'),
-    ('8', 'Traslado para exportación (no venta)'),
-    ('9', 'Venta para exportación'),
 ]
+INTERNAL_TRANSFER = '5'
 
-LISTA_PAGO = [
-    ('1', 'Contado'),
-    ('2', 'Crédito'),
-    ('3', 'Sin costo (entrega gratuita)'),
+DISPATCH_TYPES = [
+    ('1', 'Por cuenta del receptor'),
+    ('2', 'Por cuenta del emisor a instalaciones del cliente'),
+    ('3', 'Por cuenta del emisor a otras instalaciones'),
 ]
+DISPATCH_BY_ISSUER_OTHER = '3'
 
-# Estados de control interno del envío asíncrono, análogos a los que usa
-# account_edi (to_send -> sent) pero livianos, ya que account.edi.format
-# no aplica a stock.picking.
-ESTADOS_ENVIO_DTE = [
-    ('to_send', 'Por enviar'),
-    ('sent', 'Enviado'),
-    ('error', 'Con error'),
-]
-
-ESTADOS_TERMINALES_SII = ('Aceptado', 'Reparo', 'Rechazado')
+MAX_DEST_ADDRESS = 70   # DirDest
+MAX_PLATE = 8           # Patente
+MAX_DRIVER_NAME = 30    # NombreChofer
+FALLBACK_PRICE = 1.0
 
 
 class StockPickingType(models.Model):
     _inherit = 'stock.picking.type'
 
-    config_dte_id = fields.Many2one('config.dte', string='Configuración DTE')
-    cod_dte = fields.Selection(LISTA_DTE_GUIA, string='Código de documento SII')
-    secuencia_id = fields.Many2one('ir.sequence', string='Secuencia de folios SII')
-    sucursal_nombre = fields.Char(string='Nombre de la sucursal', size=64, copy=False)
-    sucursal_codsii = fields.Char(string='Código de sucursal SII', size=64, copy=False)
+    tf_dte_cl_document_type = fields.Selection(
+        [(GUIDE_DTE_TYPE, 'Guía de despacho electrónica (52)')], string='Tipo DTE',
+    )
+    tf_dte_cl_branch_id = fields.Many2one(
+        'tf_dte_cl.branch', string='Sucursal SII', check_company=True,
+        domain="[('company_id', '=', company_id)]",
+    )
+    tf_dte_cl_transfer_type = fields.Selection(
+        TRANSFER_TYPES, string='Indicador de traslado por defecto',
+    )
+    tf_dte_cl_dispatch_type = fields.Selection(
+        DISPATCH_TYPES, string='Tipo de despacho por defecto',
+    )
+
+    @api.constrains('tf_dte_cl_document_type', 'code')
+    def _check_tf_dte_cl_document_type(self):
+        for picking_type in self:
+            if picking_type.tf_dte_cl_document_type and picking_type.code not in PICKING_CODES:
+                raise ValidationError(self.env._(
+                    'Solo las entregas y los traslados internos pueden emitir guías de despacho.'
+                ))
 
 
 class StockPicking(models.Model):
-    _inherit = ['stock.picking', 'tf.dte.builder.mixin']
+    _inherit = ['stock.picking', 'tf_dte_cl.document.mixin']
 
-    @api.model
-    def _get_default_sucursal(self):
-        return self.env.user.sucursal_id.id or False
+    tf_dte_cl_is_dte = fields.Boolean(string='Emite guía', compute='_compute_tf_dte_cl_is_dte')
+    tf_dte_cl_reference_ids = fields.One2many(
+        'tf_dte_cl.reference', 'picking_id', string='Referencias SII', copy=False,
+    )
+    tf_dte_cl_transfer_type = fields.Selection(
+        TRANSFER_TYPES, string='Indicador de traslado',
+        compute='_compute_tf_dte_cl_defaults', store=True, readonly=False,
+    )
+    tf_dte_cl_dispatch_type = fields.Selection(
+        DISPATCH_TYPES, string='Tipo de despacho',
+        compute='_compute_tf_dte_cl_defaults', store=True, readonly=False,
+    )
+    tf_dte_cl_carrier_id = fields.Many2one(
+        'res.partner', string='Transportista', domain="[('tf_dte_cl_is_carrier', '=', True)]",
+    )
+    tf_dte_cl_vehicle_plate = fields.Char(string='Patente', size=MAX_PLATE)
+    tf_dte_cl_driver_rut = fields.Char(string='RUT del chofer')
+    tf_dte_cl_driver_name = fields.Char(string='Nombre del chofer', size=MAX_DRIVER_NAME)
+    tf_dte_cl_dest_street = fields.Char(
+        string='Dirección de destino', compute='_compute_tf_dte_cl_destination', store=True, readonly=False,
+    )
+    tf_dte_cl_dest_comuna_id = fields.Many2one(
+        'tf_dte_cl.comuna', string='Comuna de destino',
+        compute='_compute_tf_dte_cl_destination', store=True, readonly=False,
+    )
+    tf_dte_cl_dest_city = fields.Char(
+        string='Ciudad de destino', compute='_compute_tf_dte_cl_destination', store=True, readonly=False,
+    )
 
-    @api.model
-    def _get_default_country(self):
-        return self.env['res.country'].search([('code', '=', 'CL')], limit=1).id
+    @api.depends('picking_type_id.tf_dte_cl_document_type', 'picking_type_id.code')
+    def _compute_tf_dte_cl_is_dte(self):
+        for picking in self:
+            picking.tf_dte_cl_is_dte = bool(
+                picking.picking_type_id.tf_dte_cl_document_type
+                and picking.picking_type_id.code in PICKING_CODES
+            )
+
+    @api.depends('picking_type_id')
+    def _compute_tf_dte_cl_defaults(self):
+        for picking in self:
+            picking_type = picking.picking_type_id
+            if not picking.tf_dte_cl_transfer_type:
+                picking.tf_dte_cl_transfer_type = picking_type.tf_dte_cl_transfer_type
+            if not picking.tf_dte_cl_dispatch_type:
+                picking.tf_dte_cl_dispatch_type = picking_type.tf_dte_cl_dispatch_type
+
+    @api.depends('partner_id')
+    def _compute_tf_dte_cl_destination(self):
+        for picking in self:
+            partner = picking.partner_id
+            picking.tf_dte_cl_dest_street = ', '.join(filter(None, [partner.street, partner.street2])) or False
+            picking.tf_dte_cl_dest_comuna_id = partner.tf_dte_cl_comuna_id
+            picking.tf_dte_cl_dest_city = partner.city
 
     # ------------------------------------------------------------------
-    # Campos DTE
+    # Implementación del mixin
     # ------------------------------------------------------------------
-    es_dte = fields.Boolean(string='Es DTE', compute='_compute_es_dte', store=True)
-    xml_envio_id = fields.Many2one('xml.envio', string='Sobre de envío SII', readonly=True, copy=False)
-    confirmado_previamente = fields.Boolean(string='Folio ya asignado', copy=False)
-    track_id = fields.Char(string='Track ID', size=64, copy=False)
-    dte_send_state = fields.Selection(
-        ESTADOS_ENVIO_DTE, string='Estado de envío', copy=False,
-        help='Control interno del proceso asíncrono de timbrado y transmisión al SII.',
-    )
-    estado_dte = fields.Char(string='Estado DTE', size=128, readonly=True, copy=False)
-    detalle_estado = fields.Text(string='Detalle del estado DTE', readonly=True, copy=False)
-    referencias_ids = fields.One2many(
-        'account.move.referencia', 'pick_id', string='Referencias', copy=False,
-    )
-    sucursal_id = fields.Many2one(
-        'config.sucursales', string='Sucursal', default=lambda self: self._get_default_sucursal(), copy=False,
-    )
-    tipo_despacho = fields.Selection(LISTA_DESPACHO, string='Tipo de despacho')
-    indicacion_traslado = fields.Selection(LISTA_TRASLADO, string='Indicador de traslado de bienes')
-    forma_pago = fields.Selection(LISTA_PAGO, string='Forma de pago')
-    country_id = fields.Many2one(
-        'res.country', string='País', ondelete='restrict', default=lambda self: self._get_default_country(),
-    )
-    state_id = fields.Many2one(
-        'res.country.state', string='Región', ondelete='restrict', domain="[('country_id', '=?', country_id)]",
-    )
-    ciudad = fields.Char(string='Ciudad')
-    comuna_id = fields.Many2one('res.comuna', string='Comuna', domain="[('state_id', '=', state_id)]")
-    direccion_destino = fields.Char(string='Dirección de destino', size=128, copy=False)
-    transportista_id = fields.Many2one(
-        'res.partner', string='Transportista', check_company=True, domain="[('transportista', '=', True)]",
-    )
-
-    @api.depends('picking_type_id.cod_dte', 'picking_type_id.config_dte_id')
-    def _compute_es_dte(self):
-        for pick in self:
-            pick.es_dte = bool(pick.picking_type_id.cod_dte and pick.picking_type_id.config_dte_id)
-
-    # ------------------------------------------------------------------
-    # Flujo de negocio
-    # ------------------------------------------------------------------
-    def action_confirm(self):
-        res = super().action_confirm()
-        for pick in self.filtered('es_dte'):
-            if not pick.direccion_destino:
-                pick._copiar_direccion_cliente()
-        return res
-
-    def _copiar_direccion_cliente(self):
+    def _tf_dte_cl_get_document_type(self):
         self.ensure_one()
-        partner = self.partner_id
-        direccion = partner.street
-        if partner.street2:
-            direccion = '%s, %s' % (direccion, partner.street2)
-        self.write({
-            'state_id': partner.state_id.id,
-            'ciudad': partner.city,
-            'comuna_id': partner.comuna_id.id,
-            'direccion_destino': direccion,
-        })
+        return self.tf_dte_cl_is_dte and GUIDE_DTE_TYPE
 
+    def _tf_dte_cl_get_branch(self):
+        return self.picking_type_id.tf_dte_cl_branch_id
+
+    def _tf_dte_cl_get_receiver(self):
+        if self.partner_id:
+            return self.partner_id
+        if self.tf_dte_cl_transfer_type == INTERNAL_TRANSFER:
+            return self.company_id.partner_id
+        return self.env['res.partner']
+
+    def _tf_dte_cl_get_emission_date(self):
+        if self.date_done:
+            return fields.Date.context_today(self, self.date_done)
+        return fields.Date.context_today(self)
+
+    def _tf_dte_cl_get_references(self):
+        return self.tf_dte_cl_reference_ids
+
+    def _tf_dte_cl_moves(self):
+        return self.move_ids.filtered(lambda move: move.picked and move.quantity > 0)
+
+    def _tf_dte_cl_move_price(self, move) -> tuple[float, float, models.Model, bool]:
+        """(precio unitario en CLP y en la UdM del movimiento, descuento %, impuestos, precio de respaldo)."""
+        company = self.company_id
+        date = self._tf_dte_cl_get_emission_date()
+        sale_line = move.sale_line_id
+        if sale_line and sale_line.price_unit:
+            price = sale_line.product_uom._compute_price(sale_line.price_unit, move.product_uom)
+            if sale_line.currency_id != company.currency_id:
+                price = sale_line.currency_id._convert(price, company.currency_id, company, date)
+            tax_field = 'tax_id' if 'tax_id' in sale_line._fields else 'tax_ids'
+            return price, sale_line.discount, sale_line[tax_field], False
+        product = move.product_id
+        taxes = product.taxes_id.filtered(lambda tax: tax.company_id == company)
+        price = product.uom_id._compute_price(product.lst_price, move.product_uom)
+        if price:
+            return price, 0.0, taxes, False
+        return FALLBACK_PRICE, 0.0, taxes, True
+
+    def _tf_dte_cl_line_infos(self, with_fallback_flags: bool = False):
+        currency = self.company_id.currency_id
+        infos, fallback = [], []
+        for move in self._tf_dte_cl_moves():
+            price, discount, taxes, used_fallback = self._tf_dte_cl_move_price(move)
+            subtotal = currency.round(move.quantity * price * (1 - (discount or 0.0) / 100.0))
+            infos.append(LineInfo(
+                label=move.product_id.display_name,
+                product_name=move.product_id.name,
+                description=move.description_picking or '',
+                default_code=move.product_id.default_code or '',
+                quantity=move.quantity,
+                uom=move.product_uom.name or '',
+                price_unit=price,
+                discount=discount or 0.0,
+                subtotal=subtotal,
+                taxes=[tax._tf_dte_cl_info() for tax in taxes.sudo()],
+            ))
+            if used_fallback:
+                fallback.append(move.product_id.display_name)
+        return (infos, fallback) if with_fallback_flags else infos
+
+    def _tf_dte_cl_specific_errors(self) -> list[str]:
+        self.ensure_one()
+        _ = self.env._
+        errors = []
+        if not self.tf_dte_cl_transfer_type:
+            errors.append(_('falta el indicador de traslado'))
+        if not self.tf_dte_cl_dispatch_type:
+            errors.append(_('falta el tipo de despacho'))
+        if self.tf_dte_cl_dispatch_type == DISPATCH_BY_ISSUER_OTHER:
+            if not self.tf_dte_cl_carrier_id:
+                errors.append(_('el despacho a otras instalaciones requiere el transportista'))
+            elif not is_valid_rut(self.tf_dte_cl_carrier_id.commercial_partner_id.vat):
+                errors.append(_('el transportista no tiene un RUT válido'))
+        if self.tf_dte_cl_driver_rut:
+            if not is_valid_rut(self.tf_dte_cl_driver_rut):
+                errors.append(_('el RUT del chofer es inválido'))
+            if not self.tf_dte_cl_driver_name:
+                errors.append(_('si informa el RUT del chofer, debe indicar su nombre'))
+        if not self.tf_dte_cl_dest_comuna_id:
+            errors.append(_('falta la comuna de destino'))
+        if not self.tf_dte_cl_dest_street:
+            errors.append(_('falta la dirección de destino'))
+        errors += line_errors(GUIDE_DTE_TYPE, self._tf_dte_cl_line_infos())
+        return errors
+
+    def _tf_dte_cl_document_values(self) -> dict:
+        self.ensure_one()
+        infos, fallback = self._tf_dte_cl_line_infos(with_fallback_flags=True)
+        if fallback:
+            self._tf_dte_cl_log(self.env._(
+                'Guía valorizada con precio 1 por no tener precio de venta ni de lista: %s.',
+                ', '.join(fallback),
+            ))
+        thermal = self.company_id.tf_dte_cl_print_format == 'thermal'
+        id_doc = {
+            'TipoDespacho': int(self.tf_dte_cl_dispatch_type),
+            'IndTraslado': int(self.tf_dte_cl_transfer_type),
+            'TpoImpresion': 'T' if thermal else 'N',
+        }
+        transport = {
+            'Patente': (self.tf_dte_cl_vehicle_plate or '')[:MAX_PLATE],
+            'DirDest': (self.tf_dte_cl_dest_street or '')[:MAX_DEST_ADDRESS],
+            'CmnaDest': self.tf_dte_cl_dest_comuna_id.name,
+            'CiudadDest': self.tf_dte_cl_dest_city,
+        }
+        if self.tf_dte_cl_carrier_id:
+            transport['RUTTrans'] = normalize_rut(self.tf_dte_cl_carrier_id.commercial_partner_id.vat)
+        if self.tf_dte_cl_driver_rut:
+            transport['RUTChofer'] = normalize_rut(self.tf_dte_cl_driver_rut)
+            transport['NombreChofer'] = (self.tf_dte_cl_driver_name or '')[:MAX_DRIVER_NAME]
+        values = {'IdDoc': id_doc, 'Transporte': transport, 'Detalle': build_detail(infos)}
+        rate = iva_rate(infos)
+        if rate:
+            values['TasaIVA'] = rate
+        return values
+
+    def _tf_dte_cl_expected_amounts(self) -> dict:
+        # La guía no genera asientos: se verifican las bases calculadas desde los movimientos.
+        net, exempt = split_amounts(self._tf_dte_cl_line_infos())
+        return {'MntNeto': net, 'MntExe': exempt}
+
+    # ------------------------------------------------------------------
+    # Flujo de inventario
+    # ------------------------------------------------------------------
     def button_validate(self):
-        """Valida la configuración DTE de forma síncrona (rápida, sin red) y deja el
-        documento encolado para el cron de transmisión. La llamada real al SII
-        (timbrado y envío) nunca ocurre aquí, para no bloquear la interfaz.
-        """
-        dte_pickings = self.filtered('es_dte')
-        if dte_pickings:
-            dte_pickings._dte_check_configuration()
-        res = super().button_validate()
-        dte_pickings.write({'dte_send_state': 'to_send'})
+        # Validación temprana (sin folio) para no mover stock si la guía no se puede emitir.
+        # Si aún no hay cantidades preparadas, Odoo las marca al validar: se revisa en _action_done.
+        self.filtered(
+            lambda p: p.tf_dte_cl_is_dte and not p.tf_dte_cl_state and any(p.move_ids.mapped('picked'))
+        )._tf_dte_cl_check_ready()
+        return super().button_validate()
+
+    def _action_done(self):
+        res = super()._action_done()
+        # Firma local (sin red): un error revierte la validación y el folio vuelve al CAF.
+        self.filtered(lambda p: p.state == 'done' and p.tf_dte_cl_is_dte)._tf_dte_cl_prepare()
         return res
 
-    def _dte_check_configuration(self):
-        for pick in self:
-            conf = pick.picking_type_id.config_dte_id
-            cod_dte = pick.picking_type_id.cod_dte
-            if not any(caf.name == cod_dte for caf in conf.caf_files_ids):
-                raise UserError(_(
-                    'No hay un CAF cargado en "%s" para el tipo de documento %s.'
-                ) % (conf.name, cod_dte))
-            faltantes = pick._dte_revisar_cliente(pick.partner_id)
-            if faltantes:
-                raise UserError(_(
-                    'Faltan datos del cliente "%s" para emitir la guía: %s.'
-                ) % (pick.partner_id.name, ', '.join(faltantes)))
-            if not (pick.tipo_despacho and pick.indicacion_traslado and pick.forma_pago):
-                raise UserError(_(
-                    'Debe completar el tipo de despacho, el indicador de traslado y la '
-                    'forma de pago antes de validar la guía.'
-                ))
-
-    def unlink(self):
-        bloqueados = self.filtered(
-            lambda p: p.xml_envio_id or p.estado_dte in ESTADOS_TERMINALES_SII
-        )
-        if bloqueados:
-            raise UserError(_(
-                'No puede eliminar una guía con trámite ante el SII: %s.'
-            ) % ', '.join(bloqueados.mapped('name')))
-        return super().unlink()
-
-    def restablecer(self):
-        for pick in self:
-            if pick.estado_dte == 'Aceptado':
-                raise UserError(_('No se puede restablecer una guía ya aceptada por el SII.'))
-            if pick.xml_envio_id:
-                pick.xml_envio_id.unlink()
-            pick.write({
-                'track_id': False,
-                'estado_dte': False,
-                'detalle_estado': False,
-                'dte_send_state': 'to_send' if pick.state == 'done' else False,
-            })
-        return True
+    @api.ondelete(at_uninstall=False)
+    def _unlink_except_tf_dte_cl(self):
+        if self.filtered('tf_dte_cl_folio'):
+            raise UserError(self.env._('No se puede eliminar una transferencia que tuvo folio SII.'))
 
     # ------------------------------------------------------------------
-    # Builders — reutilizan tf.dte.builder.mixin, extendidos con datos
-    # propios de la guía (sucursal, tipo de despacho, forma de pago).
-    # ------------------------------------------------------------------
-    def _dte_data_emisor(self, conf):
-        self.ensure_one()
-        emisor = super()._dte_data_emisor(conf)
-        emisor['Sucursal'] = self.picking_type_id.sucursal_nombre
-        emisor['CdgSIISucur'] = int(self.picking_type_id.sucursal_codsii or 0) or False
-        return emisor
-
-    def _dte_tipo_impresion(self, conf):
-        return 'T' if conf.formato_impresion in ('a4ter', 'terter') else 'N'
-
-    def _dte_id_doc(self, cod_dte, conf):
-        self.ensure_one()
-        return collections.OrderedDict(
-            Folio=self._dte_folio(self.name),
-            FchEmis=self.scheduled_date.strftime('%Y-%m-%d'),
-            TipoDespacho=int(self.tipo_despacho),
-            IndTraslado=int(self.indicacion_traslado),
-            TpoImpresion=self._dte_tipo_impresion(conf),
-            FmaPago=int(self.forma_pago),
-        )
-
-    def _dte_cod_imp(self, move):
-        impuestos = move.sale_line_id.tax_id if move.sale_line_id else self.env['account.tax']
-        return [{'CodImp': imp.codigo_sii} for imp in impuestos if imp.codigo_sii]
-
-    def _dte_precio_item(self, move):
-        if move.sale_line_id and move.sale_line_id.price_unit:
-            return move.sale_line_id.price_unit
-        return 1.0
-
-    def _dte_detalle_doc(self):
-        self.ensure_one()
-        detalle = []
-        movimientos = self.move_ids.filtered('picked')
-        for i, move in enumerate(movimientos, start=1):
-            detalle.append({
-                'NroLinDet': i,
-                'NmbItem': move.product_id.name,
-                'QtyItem': move.quantity,
-                'UnmdItem': 'Unid',
-                'PrcItem': self._dte_precio_item(move),
-                'Impuesto': self._dte_cod_imp(move),
-            })
-        return detalle
-
-    def _dte_data_documento(self, conf, cod_dte):
-        self.ensure_one()
-        id_doc = self._dte_id_doc(cod_dte, conf)
-        encabezado = collections.OrderedDict(
-            IdDoc=id_doc,
-            Emisor=self._dte_data_emisor(conf),
-            Receptor=self._dte_receptor(self.partner_id),
-        )
-        documento = collections.OrderedDict(
-            NroDTE=1,
-            Encabezado=encabezado,
-            Detalle=self._dte_detalle_doc(),
-            Referencia=self._dte_referencias(self.referencias_ids, cod_dte, requiere_referencia=()),
-        )
-        self._dte_verifica_folio(conf, cod_dte, id_doc['Folio'])
-        return [collections.OrderedDict(
-            TipoDTE=int(cod_dte),
-            caf_file=self._dte_caf_file(conf, cod_dte),
-            documentos=[documento],
-        )]
-
-    def _dte_build_envio(self, conf, cod_dte):
-        self.ensure_one()
-        return collections.OrderedDict(
-            Emisor=self._dte_data_emisor(conf),
-            RutReceptor='60803000-K',
-            firma_electronica=self._dte_data_firma_electronica(conf),
-            Documento=self._dte_data_documento(conf, cod_dte),
-            api=False,
-        )
-
-    def _dte_build_consulta(self):
-        self.ensure_one()
-        conf = self.picking_type_id.config_dte_id
-        cod_dte = self.picking_type_id.cod_dte
-        return collections.OrderedDict(
-            Emisor=self._dte_data_emisor(conf),
-            firma_electronica=self._dte_data_firma_electronica(conf),
-            codigo_envio=self.track_id,
-            Documento=self._dte_data_documento(conf, cod_dte),
-        )
-
-    # ------------------------------------------------------------------
-    # Asignación de folio + procesamiento de respuestas
-    # ------------------------------------------------------------------
-    def _dte_asignar_folio(self):
-        for pick in self:
-            if pick.confirmado_previamente:
-                continue
-            secuencia = pick.picking_type_id.secuencia_id
-            if not secuencia:
-                continue
-            pick.write({
-                'name': str(secuencia.next_by_id()),
-                'confirmado_previamente': True,
-            })
-
-    def _dte_procesar_respuesta_envio(self, respuesta, cod_dte):
-        self.ensure_one()
-        if self.xml_envio_id:
-            self.xml_envio_id.unlink()
-        xml_envio = self.env['xml.envio'].create({
-            'name': 'T%sF%s' % (cod_dte, self._dte_folio(self.name)),
-            'sii_send_ident': respuesta.get('sii_send_ident'),
-            'sii_xml_request': respuesta.get('sii_xml_request'),
-            'sii_xml_dte': respuesta.get('sii_xml_request'),
-            'sii_barcode': respuesta.get('sii_barcode'),
-            'pick_id': self.id,
-        })
-        self.write({
-            'xml_envio_id': xml_envio.id,
-            'track_id': respuesta.get('sii_send_ident'),
-            'estado_dte': respuesta.get('status'),
-        })
-
-    def _dte_procesar_respuesta_consulta(self, respuesta):
-        self.ensure_one()
-        if not isinstance(respuesta, dict):
-            return
-        clave = 'T%sF%s' % (self.picking_type_id.cod_dte, self._dte_folio(self.name))
-        if clave in respuesta:
-            respuesta = respuesta[clave]
-        estado = respuesta.get('status', self.estado_dte)
-        self.write({'estado_dte': estado})
-        if self.xml_envio_id and estado in dict(self.xml_envio_id._fields['state'].selection):
-            self.xml_envio_id.write({
-                'state': estado,
-                'sii_xml_response': respuesta.get('xml_resp', self.xml_envio_id.sii_xml_response),
-            })
-
-    # ------------------------------------------------------------------
-    # Cron: envío asíncrono y consulta de estado. La llamada de red vive
-    # aquí — nunca en button_validate — y cada guía se procesa de forma
-    # defensiva para que un error de timeout/HTTP en una no interrumpa
-    # el resto del lote ni la transacción de base de datos.
+    # Crons
     # ------------------------------------------------------------------
     @api.model
-    def _cron_procesar_guias_dte(self, batch_size=50):
-        if fe is None:
-            _logger.warning('No se puede procesar guías DTE: falta la librería "facturacion_electronica".')
-            return
-        pendientes = self.search([('dte_send_state', '=', 'to_send')], limit=batch_size)
-        pendientes._dte_asignar_folio()
-        for pick in pendientes:
-            try:
-                conf = pick.picking_type_id.config_dte_id
-                cod_dte = pick.picking_type_id.cod_dte
-                data = pick._dte_build_envio(conf, cod_dte)
-                if conf.modo == 'pruebas':
-                    _logger.info('Guía DTE en modo de pruebas, no se transmite: %s', pick.name)
-                    pick.dte_send_state = 'sent'
-                    continue
-                respuesta = fe.timbrar_y_enviar(data)
-                pick._dte_procesar_respuesta_envio(respuesta, cod_dte)
-                pick.dte_send_state = 'sent'
-            except UserError as error:
-                pick.write({'dte_send_state': 'error', 'detalle_estado': str(error)})
-            except Exception as error:  # noqa: BLE001 - error de red/timeout de la librería externa
-                _logger.exception('Error al timbrar/enviar la guía %s', pick.name)
-                pick.write({'dte_send_state': 'error', 'detalle_estado': str(error)})
+    def _cron_tf_dte_cl_send(self, limit=50):
+        pickings = self.search([('tf_dte_cl_state', '=', 'signed')], order='id', limit=limit)
+        pickings._tf_dte_cl_run_each('_tf_dte_cl_send')
 
     @api.model
-    def _cron_consultar_estado_dte(self, batch_size=80):
-        if fe is None:
-            return
-        pendientes = self.search([
-            ('es_dte', '=', True),
-            ('track_id', '!=', False),
-            ('estado_dte', 'not in', list(ESTADOS_TERMINALES_SII)),
-        ], limit=batch_size)
-        for pick in pendientes:
-            try:
-                respuesta = fe.consulta_estado_dte(pick._dte_build_consulta())
-                pick._dte_procesar_respuesta_consulta(respuesta)
-            except Exception:  # noqa: BLE001
-                _logger.exception('Error al consultar el estado SII de la guía %s', pick.name)
-
-    def consulta_estado_dte(self):
-        self._cron_consultar_estado_dte.__func__(self.browse(self.ids))
-        return True
-
-    # ------------------------------------------------------------------
-    # Impresión
-    # ------------------------------------------------------------------
-    def imprimir_dte(self):
-        self.ensure_one()
-        conf = self.picking_type_id.config_dte_id
-        if not conf:
-            return True
-        reporte = 'action_imprimir_guia_termico' if conf.formato_impresion == 'a4ter' \
-            else 'action_imprimir_dte_guia'
-        return self.env.ref('tf_dte_cl.%s' % reporte).report_action(self)
-
-    def _get_printed_report_name(self):
-        self.ensure_one()
-        return '%s %s' % (self.picking_type_id.name, self._dte_formato_numero(self._dte_folio(self.name)))
-
-    def numero_documento(self):
-        self.ensure_one()
-        digitos = self._dte_folio(self.name)
-        return self._dte_formato_numero(digitos) if digitos else ''
+    def _cron_tf_dte_cl_query(self):
+        self._tf_dte_cl_cron_query()

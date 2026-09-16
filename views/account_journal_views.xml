@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: views/account_journal_views.xml -->
 <odoo>
 
     <record id="view_account_journal_form_tf_dte_cl" model="ir.ui.view">
-        <field name="name">account.journal.form.tf.dte.cl</field>
+        <field name="name">account.journal.form.tf_dte_cl</field>
         <field name="model">account.journal</field>
         <field name="inherit_id" ref="account.view_account_journal_form"/>
         <field name="arch" type="xml">
-            <field name="type" position="after">
-                <field name="cod_dte" invisible="type != 'sale'"/>
-                <field name="config_dte_id" invisible="not cod_dte"/>
-                <field name="secuencia_id" invisible="not cod_dte"/>
-            </field>
+            <xpath expr="//field[@name='type']" position="after">
+                <field name="tf_dte_cl_document_type" invisible="type != 'sale'"/>
+                <field name="tf_dte_cl_branch_id" invisible="not tf_dte_cl_document_type"
+                       options="{'no_create': True}"/>
+            </xpath>
         </field>
     </record>
 

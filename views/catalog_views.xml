@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: views/catalog_views.xml — comunas, actividades económicas, sucursales y tipos de documento -->
+<odoo>
+
+    <!-- Comunas -->
+    <record id="view_tf_dte_cl_comuna_list" model="ir.ui.view">
+        <field name="name">tf_dte_cl.comuna.list</field>
+        <field name="model">tf_dte_cl.comuna</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="state_id"/>
+                <field name="country_id" optional="hide"/>
+                <field name="active" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tf_dte_cl_comuna_search" model="ir.ui.view">
+        <field name="name">tf_dte_cl.comuna.search</field>
+        <field name="model">tf_dte_cl.comuna</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="state_id"/>
+                <filter name="without_state" string="Sin región" domain="[('state_id', '=', False)]"/>
+                <filter name="archived" string="Archivadas" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_state" string="Región" context="{'group_by': 'state_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_tf_dte_cl_comuna" model="ir.actions.act_window">
+        <field name="name">Comunas</field>
+        <field name="res_model">tf_dte_cl.comuna</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Actividades económicas -->
+    <record id="view_tf_dte_cl_activity_list" model="ir.ui.view">
+        <field name="name">tf_dte_cl.activity.list</field>
+        <field name="model">tf_dte_cl.activity</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="active" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_tf_dte_cl_activity" model="ir.actions.act_window">
+        <field name="name">Actividades económicas</field>
+        <field name="res_model">tf_dte_cl.activity</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Sucursales -->
+    <record id="view_tf_dte_cl_branch_list" model="ir.ui.view">
+        <field name="name">tf_dte_cl.branch.list</field>
+        <field name="model">tf_dte_cl.branch</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sii_code"/>
+                <field name="name"/>
+                <field name="street"/>
+                <field name="comuna_id" options="{'no_create': True}"/>
+                <field name="city"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_tf_dte_cl_branch" model="ir.actions.act_window">
+        <field name="name">Sucursales SII</field>
+        <field name="res_model">tf_dte_cl.branch</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Tipos de documento de referencia -->
+    <record id="view_tf_dte_cl_document_type_list" model="ir.ui.view">
+        <field name="name">tf_dte_cl.document_type.list</field>
+        <field name="model">tf_dte_cl.document_type</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" decoration-muted="not active">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="is_electronic"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tf_dte_cl_document_type_search" model="ir.ui.view">
+        <field name="name">tf_dte_cl.document_type.search</field>
+        <field name="model">tf_dte_cl.document_type</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <filter name="tax" string="Tributarios" domain="[('kind', '=', 'tax')]"/>
+                <filter name="other" string="No tributarios" domain="[('kind', '!=', 'tax')]"/>
+                <separator/>
+                <filter name="archived" string="Archivados" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_tf_dte_cl_document_type" model="ir.actions.act_window">
+        <field name="name">Tipos de documento de referencia</field>
+        <field name="res_model">tf_dte_cl.document_type</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p>Catálogo oficial del SII (manual de formato DTE, sección E). Las boletas, liquidaciones,
+               facturas de compra y documentos de exportación vienen archivados por estar fuera del alcance B2B.
+               Puede agregar tipos propios con código alfabético.</p>
+        </field>
+    </record>
+
+</odoo>

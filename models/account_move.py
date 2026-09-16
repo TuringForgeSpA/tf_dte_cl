@@ -1,444 +1,224 @@
 # -*- coding: utf-8 -*-
-import base64
-import collections
-import decimal
-import logging
-from io import BytesIO
+"""Facturas (33/34), notas de débito (56) y notas de crédito (61).
 
-from lxml import etree
-from PIL import Image, ImageDraw, ImageFont
+Ruta real: models/account_move.py
 
-from odoo import _, api, fields, models
+La numeración de Odoo (``name``) no se toca: el folio SII vive en
+``tf_dte_cl_folio``. El DTE se firma al publicar (sin red) y el framework
+account_edi se encarga del envío.
+"""
+from __future__ import annotations
+
+from collections import defaultdict
+
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 
-_logger = logging.getLogger(__name__)
+from .account_edi_format import DTE_CODE, SUCCESS_STATES
+from .dte_lines import LineInfo, build_detail, iva_rate, line_errors, split_amounts, IVA_CODE
+from .reference import CODE_CANCEL, CODE_FIX_AMOUNTS
 
-
-class DocumentosSII(models.Model):
-    _name = 'account.move.docs.sii'
-    _description = 'Catálogo de tipos de documento SII'
-
-    codigo = fields.Char(string='Código', size=8)
-    name = fields.Char(string='Nombre', size=64)
-
-
-class Referencias(models.Model):
-    _name = 'account.move.referencia'
-    _description = 'Línea de referencia de documentos DTE'
-
-    COD_REF = [
-        ('1', 'Anula documento'),
-        ('2', 'Corrige texto'),
-        ('3', 'Corrige montos'),
-    ]
-
-    folio = fields.Char(string='Folio')
-    fecha_documento = fields.Date(string='Fecha del documento', required=True)
-    tipo_documento = fields.Many2one('account.move.docs.sii', string='Tipo de documento')
-    codigo_ref = fields.Selection(COD_REF, string='Código de referencia')
-    motivo = fields.Char(string='Motivo')
-    ref_global = fields.Boolean(string='Referencia global')
-    move_id = fields.Many2one(
-        'account.move', ondelete='cascade', index=True, copy=False, string='Documento contable',
-    )
-    pick_id = fields.Many2one(
-        'stock.picking', ondelete='cascade', index=True, copy=False, string='Guía de despacho',
-    )
+SALE_MOVE_TYPES = ('out_invoice', 'out_refund')
+INVOICE_DTE_TYPES = ('33', '34', '56')
+CREDIT_NOTE_DTE_TYPE = '61'
 
 
 class AccountMove(models.Model):
-    _inherit = ['account.move', 'tf.dte.builder.mixin']
+    _inherit = ['account.move', 'tf_dte_cl.document.mixin']
 
-    LISTA_DTE_VENTA = ('33', '34', '43', '56')  # notas de crédito (61) se resuelven aparte
-
-    # ------------------------------------------------------------------
-    # Campos DTE
-    # ------------------------------------------------------------------
-    xml_envio_id = fields.Many2one('xml.envio', string='Sobre de envío SII', readonly=True, copy=False)
-    confirmado_previamente = fields.Boolean(string='Folio ya asignado', copy=False)
-    track_id = fields.Char(string='Track ID', size=64, copy=False)
-    estado_dte = fields.Char(string='Estado DTE', size=128, readonly=True, copy=False)
-    detalle_estado = fields.Text(string='Detalle del estado DTE', readonly=True, copy=False)
-    referencias_ids = fields.One2many(
-        'account.move.referencia', 'move_id', string='Referencias', copy=False,
+    tf_dte_cl_reference_ids = fields.One2many(
+        'tf_dte_cl.reference', 'move_id', string='Referencias SII', copy=False,
     )
-    suitable_journal_ids = fields.Many2many(
-        'account.journal', compute='_compute_suitable_journal_ids', copy=False,
+    tf_dte_cl_journal_document_type = fields.Selection(
+        related='journal_id.tf_dte_cl_document_type', string='Tipo DTE del diario',
     )
-    sucursal_id = fields.Many2one(
-        'config.sucursales', string='Sucursal', default=lambda self: self._get_default_sucursal(), copy=False,
-    )
-    journal_id = fields.Many2one(
-        'account.journal', string='Diario', required=True, readonly=True,
-        check_company=True, domain="[('id', 'in', suitable_journal_ids)]",
-        default=lambda self: self._get_default_journal(), copy=False,
-    )
+    tf_dte_cl_is_dte = fields.Boolean(string='Es DTE', compute='_compute_tf_dte_cl_is_dte')
 
-    @api.model
-    def _get_default_sucursal(self):
-        return self.env.user.sucursal_id.id or False
-
-    @api.model
-    def _get_default_journal(self):
-        journal = super()._get_default_journal()
-        move_type = self._context.get('default_move_type')
-        company_id = self._context.get('default_company_id', self.env.company.id)
-        if move_type == 'out_refund':
-            cod_dte = '61'
-        elif move_type == 'out_invoice':
-            cod_dte = self.env['res.company'].browse(company_id).doc_defecto or '33'
-        else:
-            cod_dte = False
-        if cod_dte:
-            candidato = self.env['account.journal'].search([
-                ('company_id', '=', company_id), ('type', '=', 'sale'), ('cod_dte', '=', cod_dte),
-            ], limit=1)
-            journal = candidato or journal
-        return journal
-
-    @api.depends('company_id', 'move_type')
-    def _compute_suitable_journal_ids(self):
+    @api.depends('move_type', 'journal_id.tf_dte_cl_document_type')
+    def _compute_tf_dte_cl_is_dte(self):
         for move in self:
-            company_id = move.company_id.id or self.env.company.id
-            domain = [('company_id', '=', company_id), ('type', '=', 'sale')]
-            if move.move_type == 'out_invoice':
-                domain += [('cod_dte', 'in', self.LISTA_DTE_VENTA)]
-            elif move.move_type == 'out_refund':
-                domain += [('cod_dte', '=', '61')]
-            move.suitable_journal_ids = self.env['account.journal'].search(domain)
+            move.tf_dte_cl_is_dte = bool(
+                move.move_type in SALE_MOVE_TYPES and move.journal_id.tf_dte_cl_document_type
+            )
 
     # ------------------------------------------------------------------
-    # Asignación de folio (se invoca desde account.edi.format antes de timbrar)
+    # Implementación del mixin
     # ------------------------------------------------------------------
-    def _dte_asignar_folio(self):
-        for move in self:
-            if move.confirmado_previamente:
-                continue
-            secuencia = move.journal_id.secuencia_id
-            if not secuencia:
-                continue
-            move.write({
-                'name': str(secuencia.next_by_id()),
-                'confirmado_previamente': True,
-            })
-
-    # ------------------------------------------------------------------
-    # Builders: ensamblan el diccionario que consume la librería SII
-    # ------------------------------------------------------------------
-    def _dte_totales(self, conf):
+    def _tf_dte_cl_get_document_type(self):
         self.ensure_one()
+        return self.tf_dte_cl_is_dte and self.journal_id.tf_dte_cl_document_type
+
+    def _tf_dte_cl_get_branch(self):
+        return self.journal_id.tf_dte_cl_branch_id
+
+    def _tf_dte_cl_get_receiver(self):
+        return self.partner_id
+
+    def _tf_dte_cl_get_emission_date(self):
+        # Antes de publicar, Odoo aún no completa invoice_date: usa la fecha de hoy.
+        return self.invoice_date or fields.Date.context_today(self)
+
+    def _tf_dte_cl_get_references(self):
+        return self.tf_dte_cl_reference_ids
+
+    def _tf_dte_cl_product_lines(self):
+        return self.invoice_line_ids.filtered(lambda line: line.display_type == 'product')
+
+    def _tf_dte_cl_line_infos(self) -> list[LineInfo]:
+        infos = []
+        for line in self._tf_dte_cl_product_lines():
+            product_name = line.product_id.name or (line.name or '').split('\n')[0]
+            infos.append(LineInfo(
+                label=(line.name or product_name or '').split('\n')[0][:60],
+                product_name=product_name,
+                description=line.name or '',
+                default_code=line.product_id.default_code or '',
+                quantity=line.quantity,
+                uom=line.product_uom_id.name or '',
+                price_unit=line.price_unit,
+                discount=line.discount,
+                subtotal=line.price_subtotal,
+                taxes=[tax._tf_dte_cl_info() for tax in line.tax_ids],
+            ))
+        return infos
+
+    def _tf_dte_cl_specific_errors(self) -> list[str]:
+        self.ensure_one()
+        _ = self.env._
+        errors = []
+        doc_type = self._tf_dte_cl_get_document_type()
+        if self.move_type == 'out_refund' and doc_type != CREDIT_NOTE_DTE_TYPE:
+            errors.append(_('una nota de crédito debe emitirse en un diario de notas de crédito (61)'))
+        if self.move_type == 'out_invoice' and doc_type not in INVOICE_DTE_TYPES:
+            errors.append(_('una factura o nota de débito no puede emitirse en un diario de notas de crédito'))
+        if self.currency_id != self.company_id.currency_id:
+            errors.append(_('el documento debe emitirse en la moneda de la compañía (CLP)'))
+        if any(tax.amount_type == 'group' for tax in self._tf_dte_cl_product_lines().tax_ids):
+            errors.append(_('los grupos de impuestos no están soportados en DTE; asigne los impuestos por separado'))
+        errors += line_errors(doc_type, self._tf_dte_cl_line_infos())
+        return errors
+
+    def _tf_dte_cl_document_values(self) -> dict:
+        self.ensure_one()
+        infos = self._tf_dte_cl_line_infos()
+        emission = self._tf_dte_cl_get_emission_date()
+        due = self.invoice_date_due
+        is_credit = bool(due and due > emission)
+        id_doc = {'FmaPago': 2 if is_credit else 1}
+        if is_credit:
+            id_doc['FchVenc'] = due
+        values = {'IdDoc': id_doc, 'Detalle': build_detail(infos)}
+        rate = iva_rate(infos)
+        if rate:
+            values['TasaIVA'] = rate
+        return values
+
+    def _tf_dte_cl_expected_amounts(self) -> dict:
+        self.ensure_one()
+        net, exempt = split_amounts(self._tf_dte_cl_line_infos())
+        by_code = defaultdict(float)
+        for line in self.line_ids.filtered('tax_line_id'):
+            by_code[line.tax_line_id.tf_dte_cl_sii_code] += line.balance
+        iva = abs(by_code.pop(IVA_CODE, 0.0))
+        additional = abs(sum(by_code.values()))
         return {
-            'MntNeto': int(self.amount_untaxed),
-            'TasaIVA': float(conf.valoriva),
-            'IVA': int(self.amount_tax),
-            'MntTotal': int(self.amount_total),
+            'MntNeto': net,
+            'MntExe': exempt,
+            'MntIVA': iva,
+            'ImptoReten': additional,
+            'MntTotal': self.amount_total,
         }
 
-    def _dte_id_doc(self):
-        self.ensure_one()
-        return collections.OrderedDict(
-            Folio=self._dte_folio(self.name),
-            FchEmis=self.date.strftime('%Y-%m-%d'),
-        )
-
-    def _dte_cod_imp(self, impuestos):
-        return next((imp.codigo_sii for imp in impuestos if imp.codigo_sii), 14)
-
-    def _dte_detalle_doc(self):
-        self.ensure_one()
-        detalle = []
-        lineas = self.invoice_line_ids.filtered(lambda l: not l.display_type)
-        for i, linea in enumerate(lineas, start=1):
-            total = linea.currency_id.round(linea.quantity * linea.price_unit)
-            descuento_monto = int(
-                decimal.Decimal(total * ((linea.discount or 0.0) / 100.0)).to_integral_value()
-            )
-            detalle.append({
-                'NroLinDet': i,
-                'CdgItem': {'TpoCodigo': 'INT1', 'VlrCodigo': linea.product_id.default_code or 'SC'},
-                'NmbItem': linea.product_id.name,
-                'DscItem': linea.product_id.description or '',
-                'QtyItem': linea.quantity,
-                'UnmdItem': 'Unid',
-                'PrcItem': int(round(linea.price_unit)),
-                'Impuesto': [{'CodImp': self._dte_cod_imp(linea.tax_ids)}],
-                'DescuentoMonto': descuento_monto,
-                'DescuentoPct': linea.discount or 0.0,
-                'MontoItem': int(total) - descuento_monto,
-            })
-        return detalle
-
-    def _dte_data_documento(self, conf, cod_dte):
-        self.ensure_one()
-        id_doc = self._dte_id_doc()
-        encabezado = collections.OrderedDict(
-            IdDoc=id_doc,
-            Emisor=self._dte_data_emisor(conf),
-            Receptor=self._dte_receptor(self.partner_id),
-            Totales=self._dte_totales(conf),
-        )
-        documento = collections.OrderedDict(
-            NroDTE=1,
-            Encabezado=encabezado,
-            Detalle=self._dte_detalle_doc(),
-            # TODO: implementar descuentos/recargos globales (DscRcgGlobal) cuando se
-            # requiera soportarlos; el módulo anterior nunca lo implementó (siempre []).
-            Referencia=self._dte_referencias(self.referencias_ids, cod_dte),
-        )
-        self._dte_verifica_folio(conf, cod_dte, id_doc['Folio'])
-        return [collections.OrderedDict(
-            TipoDTE=int(cod_dte),
-            caf_file=self._dte_caf_file(conf, cod_dte),
-            documentos=[documento],
-        )]
-
-    def _dte_build_envio(self, conf, cod_dte):
-        self.ensure_one()
-        return collections.OrderedDict(
-            Emisor=self._dte_data_emisor(conf),
-            RutReceptor='60803000-K',  # RUT del SII: requerido por la librería para el canal de envío
-            firma_electronica=self._dte_data_firma_electronica(conf),
-            Documento=self._dte_data_documento(conf, cod_dte),
-            api=False,
-        )
-
-    def _dte_build_consulta(self):
-        self.ensure_one()
-        conf = self.journal_id.config_dte_id
-        cod_dte = self.journal_id.cod_dte
-        return collections.OrderedDict(
-            Emisor=self._dte_data_emisor(conf),
-            firma_electronica=self._dte_data_firma_electronica(conf),
-            codigo_envio=self.track_id,
-            Documento=self._dte_data_documento(conf, cod_dte),
-        )
-
     # ------------------------------------------------------------------
-    # Procesamiento de respuestas del SII (llamado por account.edi.format)
+    # Flujo contable
     # ------------------------------------------------------------------
-    def _dte_procesar_respuesta_envio(self, respuesta, cod_dte):
-        self.ensure_one()
-        if not isinstance(respuesta, dict):
-            _logger.warning('Respuesta inesperada del SII para %s: %s', self.name, respuesta)
-            return
-        if self.xml_envio_id:
-            self.xml_envio_id.unlink()
-        xml_envio = self.env['xml.envio'].create({
-            'name': 'T%sF%s' % (cod_dte, self._dte_folio(self.name)),
-            'sii_send_ident': respuesta.get('sii_send_ident'),
-            'sii_xml_request': respuesta.get('sii_xml_request'),
-            'sii_xml_dte': respuesta.get('sii_xml_request'),
-            'sii_barcode': respuesta.get('sii_barcode'),
-            'move_id': self.id,
-        })
-        self.write({
-            'xml_envio_id': xml_envio.id,
-            'track_id': respuesta.get('sii_send_ident'),
-            'estado_dte': respuesta.get('status'),
-        })
-
-    def _dte_interpretar_glosa(self, respuesta):
-        if 'xml_resp' not in respuesta:
-            return respuesta.get('glosa', '')
-        resp_xml = respuesta['xml_resp'].replace('<?xml version="1.0" encoding="UTF-8"?>', '')
-        root = etree.fromstring(resp_xml.encode() if isinstance(resp_xml, str) else resp_xml)
-        estado, glosa, resumen = '', '', ''
-        for e in root.iter():
-            if e.tag == 'ESTADO':
-                estado = e.text
-            elif e.tag == 'GLOSA':
-                glosa += e.text or ''
-            elif e.tag == 'GLOSA_ERR':
-                glosa += ' - %s' % (e.text or '')
-            elif e.tag == 'ACEPTADOS' and e.text != '0':
-                resumen = ' Aceptado'
-            elif e.tag == 'RECHAZADOS' and e.text != '0':
-                resumen = ' Rechazado'
-            elif e.tag == 'REPAROS' and e.text != '0':
-                resumen = ' Con reparo'
-        return ' - '.join(filter(None, [estado, glosa, resumen]))
-
-    def _dte_interpretar_estado(self, respuesta):
-        estado = respuesta.get('status', self.estado_dte)
-        if estado != 'Proceso' or 'xml_resp' not in respuesta:
-            return estado
-        resp_xml = respuesta['xml_resp'].replace('<?xml version="1.0" encoding="UTF-8"?>', '')
-        root = etree.fromstring(resp_xml.encode() if isinstance(resp_xml, str) else resp_xml)
-        dok = any(e.tag == 'ESTADO' and e.text == 'DOK' for e in root.iter())
-        glosa_ok = any(
-            e.tag == 'GLOSA_ERR' and e.text == 'Documento Recibido por el SII. Datos Coinciden con los Registrados'
-            for e in root.iter()
-        )
-        if dok and glosa_ok and respuesta.get('glosa') == 'DTE Recibido':
-            return 'Aceptado'
-        return estado
-
-    def _dte_procesar_respuesta_consulta(self, respuesta):
-        self.ensure_one()
-        if not isinstance(respuesta, dict):
-            return
-        clave = 'T%sF%s' % (self.journal_id.cod_dte, self._dte_folio(self.name))
-        if clave in respuesta:
-            respuesta = respuesta[clave]
-        estado = self._dte_interpretar_estado(respuesta)
-        detalle = self._dte_interpretar_glosa(respuesta)
-        self.write({'estado_dte': estado, 'detalle_estado': detalle})
-        if self.xml_envio_id:
-            estados_validos = dict(self.xml_envio_id._fields['state'].selection)
-            self.xml_envio_id.write({
-                'state': estado if estado in estados_validos else self.xml_envio_id.state,
-                'sii_xml_response': respuesta.get('xml_resp', self.xml_envio_id.sii_xml_response),
-                'sii_receipt': detalle,
-            })
-
-    # ------------------------------------------------------------------
-    # Acciones expuestas al usuario / al cron
-    # ------------------------------------------------------------------
-    def consulta_estado_dte(self):
-        dte_format = self.env['account.edi.format'].search([('code', '=', 'tf_cl_dte')], limit=1)
-        if dte_format:
-            dte_format._tf_dte_cl_consultar_estado(self.filtered('track_id'))
-        return True
-
-    @api.model
-    def _cron_consultar_estado_dte(self, batch_size=80):
-        dte_format = self.env['account.edi.format'].search([('code', '=', 'tf_cl_dte')], limit=1)
-        if not dte_format:
-            return
-        pendientes = self.search([
-            ('journal_id.cod_dte', '!=', False),
-            ('track_id', '!=', False),
-            ('estado_dte', 'not in', ['Aceptado', 'Rechazado']),
-        ], limit=batch_size)
-        if pendientes:
-            dte_format._tf_dte_cl_consultar_estado(pendientes)
-
-    def restablecer(self):
-        for move in self:
-            if move.estado_dte == 'Aceptado':
-                raise UserError(_('No se puede restablecer un documento ya aceptado por el SII.'))
-            move.edi_document_ids.filtered(
-                lambda d: d.edi_format_id.code == 'tf_cl_dte'
-            ).write({'state': 'to_send', 'error': False, 'blocking_level': False})
-            if move.xml_envio_id:
-                move.xml_envio_id.unlink()
-            move.write({'track_id': False, 'estado_dte': False, 'detalle_estado': False})
-        return True
+    def _post(self, soft=True):
+        posted = super()._post(soft=soft)
+        # Firma local (sin red): un error revierte la publicación y el folio vuelve al CAF.
+        posted.filtered('tf_dte_cl_is_dte')._tf_dte_cl_prepare()
+        return posted
 
     def button_draft(self):
-        bloqueados = self.filtered(lambda m: m.estado_dte == 'Aceptado')
-        if bloqueados:
-            raise UserError(_(
-                'No puede volver a borrador un documento ya aceptado por el SII: %s.'
-            ) % ', '.join(bloqueados.mapped('name')))
+        self.filtered('tf_dte_cl_state')._tf_dte_cl_cancel_dte()
         return super().button_draft()
 
-    def unlink(self):
-        bloqueados = self.filtered(
-            lambda m: m.xml_envio_id or m.estado_dte in ('Aceptado', 'Reparo', 'Rechazado')
-        )
-        if bloqueados:
-            raise UserError(_(
-                'No puede eliminar un documento con trámite ante el SII: %s.'
-            ) % ', '.join(bloqueados.mapped('name')))
-        return super().unlink()
+    def button_cancel(self):
+        self.filtered('tf_dte_cl_state')._tf_dte_cl_cancel_dte()
+        return super().button_cancel()
+
+    @api.ondelete(at_uninstall=False)
+    def _unlink_except_tf_dte_cl(self):
+        if self.filtered('tf_dte_cl_folio'):
+            raise UserError(self.env._('No se puede eliminar un documento que tuvo folio SII.'))
+
+    def _tf_dte_cl_credit_note_journal(self):
+        self.ensure_one()
+        journals = self.env['account.journal'].search([
+            ('company_id', '=', self.company_id.id),
+            ('type', '=', 'sale'),
+            ('tf_dte_cl_document_type', '=', CREDIT_NOTE_DTE_TYPE),
+        ])
+        same_branch = journals.filtered(lambda j: j.tf_dte_cl_branch_id == self.journal_id.tf_dte_cl_branch_id)
+        return (same_branch or journals)[:1]
+
+    def _reverse_moves(self, default_values_list=None, cancel=False):
+        """Nota de crédito desde un DTE aceptado: diario 61 y referencia al documento original."""
+        default_values_list = list(default_values_list or [{} for _move in self])
+        doc_types = self.env['tf_dte_cl.document_type']
+        for move, default_values in zip(self, default_values_list):
+            if move.tf_dte_cl_state not in ('accepted', 'accepted_objections'):
+                continue
+            journal = self.env['account.journal'].browse(default_values.get('journal_id'))
+            if journal.tf_dte_cl_document_type != CREDIT_NOTE_DTE_TYPE:
+                credit_journal = move._tf_dte_cl_credit_note_journal()
+                if credit_journal:
+                    default_values['journal_id'] = credit_journal.id
+            doc_type = doc_types.search([('code', '=', move.tf_dte_cl_document_type)], limit=1)
+            if doc_type and not default_values.get('tf_dte_cl_reference_ids'):
+                default_values['tf_dte_cl_reference_ids'] = [fields.Command.create({
+                    'document_type_id': doc_type.id,
+                    'folio': str(move.tf_dte_cl_folio),
+                    'date': move.tf_dte_cl_emission_date,
+                    'code': CODE_CANCEL if cancel else CODE_FIX_AMOUNTS,
+                    'reason': (default_values.get('ref') or move.name or '')[:90],
+                })]
+        return super()._reverse_moves(default_values_list=default_values_list, cancel=cancel)
 
     # ------------------------------------------------------------------
-    # Impresión
+    # Crons
+    # En Odoo 18 el cron de account_edi (ir_cron_edi_network) viene inactivo y
+    # solo se dispara al publicar o cancelar: un DTE pendiente de reintento no se
+    # volvería a enviar. Estos crons envían y consultan por su cuenta y dejan el
+    # documento EDI coherente con el estado DTE.
     # ------------------------------------------------------------------
-    def sucursal_ok(self, sucursal):
-        usuario = self.user_id
-        if self.sucursal_id and sucursal:
-            return sucursal.id == self.sucursal_id.id
-        if usuario.sucursal_id and sucursal:
-            return sucursal.id == usuario.sucursal_id.id
-        return True
-
-    def termica_a4(self, conf):
-        if self.env.context.get('a4'):
-            return False
-        return conf.formato_impresion == 'a4ter'
-
-    def imprimir_dte(self):
-        self.ensure_one()
-        if not self.journal_id.cod_dte:
-            return True
-        reporte = 'action_imprimir_documento_termico' if self.termica_a4(self.journal_id.config_dte_id) \
-            else 'action_imprimir_dte'
-        return self.env.ref('tf_dte_cl.%s' % reporte).report_action(self)
-
-    def numero_documento(self):
-        self.ensure_one()
-        digitos = self._dte_folio(self.name)
-        return self._dte_formato_numero(digitos) if digitos else ''
-
-    def _get_printed_report_name(self):
-        self.ensure_one()
-        return '%s %s' % (self.journal_id.name, self.numero_documento())
-
-    def nombre_referencia(self, num_ref):
-        return dict(Referencias.COD_REF).get(num_ref, '')
-
-    def exento(self):
-        exento = sum(
-            l.price_subtotal for l in self.invoice_line_ids if not l.tax_ids.amount
-        )
-        return abs(exento)
-
-    def descuento(self, descuento):
-        if not descuento:
-            return '0,0'
-        entero, _sep, decimales = str(descuento).partition('.')
-        return '%s,%s' % (self._dte_formato_numero(entero), decimales) if decimales else str(descuento)
-
-    def getTotalDiscount(self):
-        total_discount = 0
-        for linea in self.invoice_line_ids.filtered('account_id'):
-            total = linea.currency_id.round(linea.quantity * linea.price_unit)
-            total_discount += int(
-                decimal.Decimal(total * ((linea.discount or 0.0) / 100.0)).to_integral_value()
+    def _tf_dte_cl_sync_edi_documents(self):
+        for move in self:
+            documents = move.edi_document_ids.filtered(
+                lambda d: d.edi_format_id.code == DTE_CODE and d.state == 'to_send'
             )
-        return self.currency_id.round(total_discount)
+            if not documents:
+                continue
+            if move.tf_dte_cl_state in SUCCESS_STATES:
+                documents.write({'state': 'sent', 'error': False, 'blocking_level': False})
+            elif move.tf_dte_cl_state == 'error':
+                documents.write({'error': move.tf_dte_cl_error, 'blocking_level': 'error'})
 
-    def nombre_impuesto(self, texto):
-        palabras = (texto or '').split()
-        return ' '.join(palabras[:2]) if len(palabras) >= 2 else ''
+    def _tf_dte_cl_send_and_sync(self):
+        self._tf_dte_cl_send()
+        self._tf_dte_cl_sync_edi_documents()
 
-    def currency_format(self, val, application='Product Price'):
-        lang = self.env['res.lang'].search([('code', '=', self._context.get('lang') or self.partner_id.lang)])
-        precision = self.env['decimal.precision'].precision_get(application)
-        res = lang.format('%.{}f'.format(precision), val, grouping=True, monetary=True)
-        if self.currency_id.symbol:
-            if self.currency_id.position == 'after':
-                res = '%s %s' % (res, self.currency_id.symbol)
-            else:
-                res = '%s %s' % (self.currency_id.symbol, res)
-        return res
+    def _tf_dte_cl_query_and_sync(self):
+        self._tf_dte_cl_query()
+        self._tf_dte_cl_sync_edi_documents()
 
-    def sii_header(self):
-        """Genera la caja de timbre SII (RUT / documento / folio / oficina) como PNG.
-        Corregido para Pillow >= 10: `ImageDraw.textsize` fue reemplazado por `textbbox`.
-        """
-        self.ensure_one()
-        font1 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 15)
-        font2 = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 9)
-        ancho, alto = 300, 150
-        img = Image.new('RGB', (ancho, alto), color=(255, 255, 255))
-        draw = ImageDraw.Draw(img)
-        draw.rectangle(((0, 0), (298, 113)), outline='black', width=4)
+    @api.model
+    def _cron_tf_dte_cl_send(self, limit=50):
+        moves = self.search([
+            ('state', '=', 'posted'),
+            ('tf_dte_cl_state', '=', 'signed'),
+        ], order='id', limit=limit)
+        moves._tf_dte_cl_run_each('_tf_dte_cl_send_and_sync')
 
-        conf = self.journal_id.config_dte_id
-        rut_txt = 'R.U.T.: %s' % self._dte_formato_rut(conf.rutemisor)
-        lineas = (
-            (rut_txt, font1, 20),
-            (self.journal_id.name, font1, 50),
-            ('N° %s' % self.numero_documento(), font1, 80),
-            ('SII %s' % conf.oficinasii, font2, 120),
-        )
-        for texto, font, y in lineas:
-            _, _, ancho_texto, _ = draw.textbbox((0, 0), texto, font=font)
-            draw.text(((ancho - ancho_texto) / 2, y), texto, fill=(0, 0, 0), font=font)
-
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        return base64.b64encode(buffer.getvalue()).decode()
+    @api.model
+    def _cron_tf_dte_cl_query(self):
+        self._tf_dte_cl_cron_query(method_name='_tf_dte_cl_query_and_sync')

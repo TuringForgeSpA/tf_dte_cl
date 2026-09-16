@@ -1,73 +1,109 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: views/account_move_views.xml -->
 <odoo>
 
     <record id="view_move_form_tf_dte_cl" model="ir.ui.view">
-        <field name="name">account.move.form.tf.dte.cl</field>
+        <field name="name">account.move.form.tf_dte_cl</field>
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_move_form"/>
         <field name="arch" type="xml">
 
-            <xpath expr="//button[@name='preview_invoice']" position="after">
-                <button string="Imprimir DTE" type="object" name="imprimir_dte"
-                        invisible="state == 'draft' or not xml_envio_id"/>
+            <xpath expr="/form/header" position="inside">
+                <field name="tf_dte_cl_is_dte" invisible="1"/>
+                <button name="action_tf_dte_cl_query" type="object" string="Consultar SII"
+                        invisible="tf_dte_cl_state not in ('sent', 'send_unknown')"/>
+                <button name="action_tf_dte_cl_retry" type="object" string="Reintentar DTE"
+                        class="btn-secondary" invisible="tf_dte_cl_state != 'error'"/>
+                <button name="action_tf_dte_cl_reset" type="object" string="Restablecer DTE"
+                        class="btn-danger" groups="tf_dte_cl.group_tf_dte_cl_manager"
+                        invisible="tf_dte_cl_state != 'rejected'"
+                        confirm="El folio actual quedará registrado para anulación y el documento se emitirá con un folio nuevo. ¿Continuar?"/>
             </xpath>
 
-            <xpath expr="//field[@name='journal_id']" position="after">
-                <field name="sucursal_id"/>
+            <xpath expr="/form/sheet" position="before">
+                <div class="alert alert-warning mb-0" role="alert"
+                     invisible="not tf_dte_cl_error or tf_dte_cl_state in ('accepted', 'accepted_objections')">
+                    <strong>DTE: </strong><field name="tf_dte_cl_error" readonly="1"/>
+                </div>
+                <div class="alert alert-danger mb-0" role="alert" invisible="tf_dte_cl_state != 'rejected'">
+                    <strong>El SII rechazó este documento. </strong>
+                    <field name="tf_dte_cl_sii_detail" readonly="1"/>
+                </div>
             </xpath>
 
-            <page name="other_info" position="after">
-
-                <page name="referencias_dte" string="Referencias"
-                      invisible="move_type not in ('out_invoice', 'out_refund')">
-                    <field name="referencias_ids">
+            <xpath expr="/form/sheet/notebook" position="inside">
+                <page name="tf_dte_cl_references" string="Referencias SII" invisible="not tf_dte_cl_is_dte">
+                    <field name="tf_dte_cl_reference_ids" readonly="state != 'draft'">
                         <list editable="bottom">
-                            <field name="folio" required="not ref_global"/>
-                            <field name="fecha_documento" required="1"/>
-                            <field name="tipo_documento"/>
-                            <field name="codigo_ref"/>
-                            <field name="motivo"/>
-                            <field name="ref_global"/>
+                            <field name="sequence" widget="handle"/>
+                            <field name="document_type_id" options="{'no_create': True}"/>
+                            <field name="document_type_kind" column_invisible="True"/>
+                            <field name="folio" required="not is_global"/>
+                            <field name="date"/>
+                            <field name="code"/>
+                            <field name="reason"/>
+                            <field name="is_global" optional="hide"/>
+                            <field name="other_rut" optional="hide"/>
                         </list>
                     </field>
                 </page>
-
-                <page name="dte" string="DTE"
-                      invisible="move_type not in ('out_invoice', 'out_refund')">
+                <page name="tf_dte_cl" string="DTE" invisible="not tf_dte_cl_state">
                     <group>
-                        <group string="Estado ante el SII">
-                            <field name="track_id" readonly="1"/>
-                            <field name="estado_dte" readonly="1"/>
-                            <field name="detalle_estado" readonly="1"/>
+                        <group string="Documento">
+                            <field name="tf_dte_cl_document_type"/>
+                            <field name="tf_dte_cl_folio"/>
+                            <field name="tf_dte_cl_state"/>
+                            <field name="tf_dte_cl_emission_date"/>
+                            <field name="tf_dte_cl_signed_date"/>
+                            <field name="tf_dte_cl_caf_id"/>
                         </group>
-                        <group string="Documento transmitido">
-                            <field name="xml_envio_id" readonly="1"/>
+                        <group string="SII">
+                            <field name="tf_dte_cl_envelope_id"/>
+                            <field name="tf_dte_cl_track_id"/>
+                            <field name="tf_dte_cl_sii_code"/>
+                            <field name="tf_dte_cl_sii_detail"/>
+                            <field name="tf_dte_cl_last_query"/>
                         </group>
                     </group>
-                    <group string="Acciones">
-                        <button string="Consultar estado" type="object" name="consulta_estado_dte"
-                                class="btn-secondary"
-                                invisible="state == 'draft' or not track_id"/>
-                        <button string="Restablecer" type="object" name="restablecer"
-                                class="btn-danger" groups="tf_dte_cl.group_dte_manager"
-                                invisible="not xml_envio_id"/>
+                    <group>
+                        <field name="tf_dte_cl_xml_file" filename="tf_dte_cl_xml_filename"/>
+                        <field name="tf_dte_cl_xml_filename" invisible="1"/>
                     </group>
                 </page>
-
-            </page>
+            </xpath>
 
         </field>
     </record>
 
     <record id="view_invoice_tree_tf_dte_cl" model="ir.ui.view">
-        <field name="name">account.invoice.tree.tf.dte.cl</field>
+        <field name="name">account.move.list.tf_dte_cl</field>
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_invoice_tree"/>
         <field name="arch" type="xml">
-            <field name="partner_id" position="after">
-                <field name="journal_id" optional="show"/>
-                <field name="estado_dte" optional="show"/>
-            </field>
+            <xpath expr="//list" position="inside">
+                <field name="tf_dte_cl_folio" optional="show"/>
+                <field name="tf_dte_cl_state" optional="show" widget="badge"
+                       decoration-success="tf_dte_cl_state in ('accepted', 'accepted_objections')"
+                       decoration-info="tf_dte_cl_state in ('signed', 'sent')"
+                       decoration-warning="tf_dte_cl_state == 'send_unknown'"
+                       decoration-danger="tf_dte_cl_state in ('rejected', 'error')"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_invoice_filter_tf_dte_cl" model="ir.ui.view">
+        <field name="name">account.move.search.tf_dte_cl</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_invoice_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="tf_dte_cl_folio"/>
+                <separator/>
+                <filter name="tf_dte_cl_pending" string="DTE pendientes"
+                        domain="[('tf_dte_cl_state', 'in', ('signed', 'sent', 'send_unknown'))]"/>
+                <filter name="tf_dte_cl_problems" string="DTE con problemas"
+                        domain="[('tf_dte_cl_state', 'in', ('error', 'rejected'))]"/>
+            </xpath>
         </field>
     </record>
 

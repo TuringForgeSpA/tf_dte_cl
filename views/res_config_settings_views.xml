@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: views/res_config_settings_views.xml -->
+<odoo>
+
+    <record id="res_config_settings_view_form_tf_dte_cl" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.tf_dte_cl</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="account.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <!-- Junto a la localización fiscal (account/views/res_config_settings_views.xml, Odoo 18) -->
+            <xpath expr="//app[@name='account']/block[@name='fiscal_localization_setting_container']" position="after">
+                <block title="Facturación electrónica Chile (SII)" name="tf_dte_cl_settings">
+
+                    <setting id="tf_dte_cl_status" string="Estado de la configuración"
+                             help="Se actualiza al guardar los ajustes." company_dependent="1">
+                        <div class="text-danger" invisible="not tf_dte_cl_emitter_errors">
+                            <field name="tf_dte_cl_emitter_errors" nolabel="1" readonly="1"/>
+                        </div>
+                        <div class="text-success" invisible="tf_dte_cl_emitter_errors">
+                            La compañía está lista para emitir DTE.
+                        </div>
+                    </setting>
+
+                    <setting id="tf_dte_cl_environment" string="Ambiente SII" company_dependent="1"
+                             help="Use Certificación hasta que el SII autorice la emisión en producción.">
+                        <field name="tf_dte_cl_environment" widget="radio"/>
+                        <div class="text-warning mt8" invisible="tf_dte_cl_environment != 'produccion'">
+                            Los documentos se enviarán al ambiente de producción del SII.
+                        </div>
+                    </setting>
+
+                    <setting id="tf_dte_cl_resolution" string="Resolución SII" company_dependent="1">
+                        <div class="content-group">
+                            <div class="row">
+                                <label for="tf_dte_cl_resolution_number" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_resolution_number"/>
+                            </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_resolution_date" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_resolution_date"/>
+                            </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_sii_office" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_sii_office"/>
+                            </div>
+                        </div>
+                    </setting>
+
+                    <setting id="tf_dte_cl_emitter" string="Datos del emisor" company_dependent="1"
+                             help="RUT, razón social, dirección y ciudad se toman de la ficha de la compañía.">
+                        <div class="content-group">
+                            <div class="row">
+                                <label for="tf_dte_cl_giro" string="Giro" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_giro"/>
+                            </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_comuna_id" string="Comuna" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_comuna_id" options="{'no_create': True}"/>
+                            </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_dte_email" string="Correo DTE" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_dte_email" widget="email"/>
+                            </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_activity_ids" string="Actecos" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_activity_ids" widget="many2many_tags"/>
+                            </div>
+                        </div>
+                        <div class="mt8">
+                            <button name="%(tf_dte_cl.action_tf_dte_cl_branch)d" type="action"
+                                    string="Sucursales SII" class="btn-link" icon="oi-arrow-right"/>
+                        </div>
+                    </setting>
+
+                    <setting id="tf_dte_cl_certificate" string="Certificado digital" company_dependent="1"
+                             help="Certificado (.p12 / .pfx) con el que se firman los DTE.">
+                        <field name="tf_dte_cl_certificate_id" options="{'no_create': True}"
+                               context="{'active_test': False}"/>
+                        <div class="mt8">
+                            <button name="%(tf_dte_cl.action_tf_dte_cl_certificate_load)d" type="action"
+                                    string="Cargar certificado" class="btn-link" icon="oi-arrow-right"/>
+                            <button name="%(tf_dte_cl.action_tf_dte_cl_certificate)d" type="action"
+                                    string="Ver certificados" class="btn-link" icon="oi-arrow-right"/>
+                        </div>
+                    </setting>
+
+                    <setting id="tf_dte_cl_documents" string="Documentos" company_dependent="1">
+                        <div class="content-group">
+                            <div class="row">
+                                <label for="tf_dte_cl_default_document" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_default_document"/>
+                            </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_caf_validity_months" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_caf_validity_months"/>
+                            </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_print_format" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_print_format"/>
+                            </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_print_logo" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_print_logo"/>
+                            </div>
+                        </div>
+                    </setting>
+
+                    <setting id="tf_dte_cl_sending" string="Envío al SII"
+                             help="Protección contra envíos duplicados cuando no hay respuesta del SII.">
+                        <div class="content-group">
+                            <div class="row">
+                                <label for="tf_dte_cl_unknown_resend_minutes" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_unknown_resend_minutes"/>
+                            </div>
+                        </div>
+                    </setting>
+
+                </block>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
