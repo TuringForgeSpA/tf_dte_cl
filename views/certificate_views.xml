@@ -68,7 +68,7 @@
         <field name="arch" type="xml">
             <form>
                 <group>
-                    <field name="p12_file" filename="p12_filename"/>
+                    <field name="p12_file" filename="p12_filename" required="1"/>
                     <field name="p12_filename" invisible="1"/>
                     <field name="password" password="True"/>
                     <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>

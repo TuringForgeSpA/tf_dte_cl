@@ -260,7 +260,9 @@ class TfDteClCertificateLoad(models.TransientModel):
     company_id = fields.Many2one(
         'res.company', string='Compañía', required=True, default=lambda self: self.env.company,
     )
-    p12_file = fields.Binary(string='Archivo (.p12 / .pfx)', required=True, attachment=False)
+    # Sin required a nivel de modelo: la columna quedaría NOT NULL y no podría
+    # vaciarse al terminar la carga. La obligatoriedad se exige en la vista y en action_load.
+    p12_file = fields.Binary(string='Archivo (.p12 / .pfx)', attachment=False)
     p12_filename = fields.Char(string='Nombre del archivo')
     password = fields.Char(string='Contraseña')
     make_default = fields.Boolean(string='Usar como certificado de la compañía', default=True)
@@ -283,6 +285,8 @@ class TfDteClCertificateLoad(models.TransientModel):
         self.ensure_one()
         if self.company_id not in self.env.companies:
             raise UserError(self.env._('No tiene acceso a la compañía seleccionada.'))
+        if not self.p12_file:
+            raise UserError(self.env._('Debe adjuntar el archivo del certificado (.p12 o .pfx).'))
         Certificate = self.env['tf_dte_cl.certificate']
         try:
             vals = Certificate._tf_dte_cl_parse_p12(base64.b64decode(self.p12_file), self.password or '')
