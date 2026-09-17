@@ -24,6 +24,9 @@ CREDIT_NOTE_DTE_TYPE = '61'
 
 
 class AccountMove(models.Model):
+    # _name explícito: sin él, Odoo arma un modelo nuevo al combinar la extensión
+    # con el mixin y duplica los campos heredados (p. ej. los Many2many).
+    _name = 'account.move'
     _inherit = ['account.move', 'tf_dte_cl.document.mixin']
 
     tf_dte_cl_reference_ids = fields.One2many(

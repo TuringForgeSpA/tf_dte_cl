@@ -75,6 +75,9 @@ class StockPickingType(models.Model):
 
 
 class StockPicking(models.Model):
+    # _name explícito: sin él, Odoo arma un modelo nuevo al combinar la extensión
+    # con el mixin y duplica los campos heredados (p. ej. los Many2many).
+    _name = 'stock.picking'
     _inherit = ['stock.picking', 'tf_dte_cl.document.mixin']
 
     tf_dte_cl_is_dte = fields.Boolean(string='Emite guía', compute='_compute_tf_dte_cl_is_dte')

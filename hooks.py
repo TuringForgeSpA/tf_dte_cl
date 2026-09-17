@@ -60,7 +60,8 @@ def _tf_dte_cl_load_comunas(env):
     states = env['res.country.state'].search([('country_id', '=', chile.id)])
     cache, without_region, vals_list = {}, [], []
 
-    with file_open(SEED_PATH, mode='r', encoding='utf-8') as seed:
+    # file_open abre en UTF-8 cuando el modo es texto; no acepta el argumento encoding.
+    with file_open(SEED_PATH, mode='r') as seed:
         for row in csv.DictReader(seed):
             code = str(row['codigo']).strip()
             if code in existing:
