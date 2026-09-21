@@ -163,13 +163,19 @@ el formato estándar de Odoo. Hay además una versión para papel continuo de 80
 
 ## Estado y pendientes
 
-Probado en producción: factura electrónica (33) y nota de crédito (61)
-aceptadas por el SII.
+Probado en producción:
+
+- Factura electrónica (33) y nota de crédito (61) aceptadas por el SII.
+- Representación impresa en hoja revisada contra el manual de muestras
+  impresas: la factura con su copia tributaria y cedible (acuse de recibo y
+  leyenda «CEDIBLE»), y la nota de crédito sin copia cedible, con su referencia
+  al documento anulado.
 
 Pendiente:
 
-- Probar factura exenta (34), nota de débito (56) y guía de despacho (52).
-- Validar la impresión con documentos reales contra el manual de muestras impresas.
+- Probar factura exenta (34), nota de débito (56) y guía de despacho (52),
+  incluida su impresión.
+- Revisar la impresión en papel continuo (80 mm) con documentos reales.
 - Intercambio de DTE con el receptor.
 - Suite de pruebas de Odoo (`tests/`).
 
