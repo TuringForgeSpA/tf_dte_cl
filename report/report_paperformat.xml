@@ -2,6 +2,21 @@
 <!-- Ruta real: report/report_paperformat.xml -->
 <odoo>
 
+    <!-- A4 sin el margen del encabezado estándar: el DTE lleva su encabezado en el cuerpo. -->
+    <record id="paperformat_tf_dte_cl_a4" model="report.paperformat">
+        <field name="name">DTE A4</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">10</field>
+        <field name="margin_bottom">10</field>
+        <field name="margin_left">7</field>
+        <field name="margin_right">7</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
     <record id="paperformat_tf_dte_cl_thermal" model="report.paperformat">
         <field name="name">DTE térmico 80 mm</field>
         <field name="default" eval="False"/>

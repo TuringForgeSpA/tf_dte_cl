@@ -70,11 +70,16 @@ class AccountMove(models.Model):
     def _tf_dte_cl_line_infos(self) -> list[LineInfo]:
         infos = []
         for line in self._tf_dte_cl_product_lines():
-            product_name = line.product_id.name or (line.name or '').split('\n')[0]
+            product = line.product_id
+            product_name = product.name or (line.name or '').split('\n')[0]
+            description = (line.name or '').strip()
+            # Odoo propone "[código] nombre" como descripción: no se repite bajo el nombre.
+            if description in (product_name, product.display_name, product.partner_ref):
+                description = ''
             infos.append(LineInfo(
                 label=(line.name or product_name or '').split('\n')[0][:60],
                 product_name=product_name,
-                description=line.name or '',
+                description=description,
                 default_code=line.product_id.default_code or '',
                 quantity=line.quantity,
                 uom=line.product_uom_id.name or '',
@@ -131,6 +136,15 @@ class AccountMove(models.Model):
             'ImptoReten': additional,
             'MntTotal': self.amount_total,
         }
+
+    # ------------------------------------------------------------------
+    # Impresión: Imprimir, Descargar y Enviar usan el formato DTE
+    # ------------------------------------------------------------------
+    def _get_name_invoice_report(self):
+        self.ensure_one()
+        if self.tf_dte_cl_folio:
+            return 'tf_dte_cl.report_move_dte_document'
+        return super()._get_name_invoice_report()
 
     # ------------------------------------------------------------------
     # Flujo contable

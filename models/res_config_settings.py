@@ -25,6 +25,7 @@ class ResConfigSettings(models.TransientModel):
     )
     tf_dte_cl_print_format = fields.Selection(related='company_id.tf_dte_cl_print_format', readonly=False)
     tf_dte_cl_print_logo = fields.Boolean(related='company_id.tf_dte_cl_print_logo', readonly=False)
+    tf_dte_cl_print_cedible = fields.Boolean(related='company_id.tf_dte_cl_print_cedible', readonly=False)
     tf_dte_cl_caf_validity_months = fields.Integer(
         related='company_id.tf_dte_cl_caf_validity_months', readonly=False,
     )

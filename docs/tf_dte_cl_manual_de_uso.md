@@ -216,10 +216,29 @@ historial de la entrega.
 
 ### 4.5 Imprimir
 
-Con el documento emitido, usa **Imprimir** y elige *DTE (A4)* o *DTE (térmico)*.
-El PDF incluye el recuadro con RUT, tipo y folio, el timbre electrónico y los
-totales por impuesto. 🔶 *La representación impresa debe revisarse contra el
-manual de muestras impresas del SII antes de usarla en producción.*
+Los botones **Imprimir**, **Descargar > PDF** y **Enviar** generan el documento en
+formato SII cuando la factura tiene folio. Para papel de 80 mm usa
+**Descargar > DTE (térmico)**. En las entregas, **Imprimir > Guía de despacho**.
+
+El formato sigue el *Manual de muestras impresas* del SII (versión 4.0):
+
+- recuadro con RUT, tipo de documento y folio, y bajo él la unidad regional
+  («S.I.I. - ...», se completa en Ajustes);
+- datos del emisor con casa matriz y sucursal, receptor, referencias y detalle
+  con el descuento en monto;
+- totales con la tasa de IVA; en documentos exentos solo monto exento y total;
+- timbre electrónico de 9 × 4 cm como máximo, a más de 2 cm del borde izquierdo,
+  con la leyenda de la resolución.
+
+**Copia cedible.** Facturas (33 y 34) y guías que constituyen venta se imprimen
+en dos páginas: la copia tributaria y la **cedible**, con el recuadro de acuse de
+recibo (Ley 19.983) y la leyenda «CEDIBLE» (en guías, «CEDIBLE CON SU
+FACTURA»). Las notas de crédito y débito, y las guías de traslado interno o que
+no son venta, no llevan copia cedible. Se puede desactivar en Ajustes
+(*Imprimir copia cedible*).
+
+Las notas internas de la factura no se imprimen en el DTE: el manual no permite
+textos con tratos comerciales en el documento tributario.
 
 ### 4.6 Documento rechazado
 

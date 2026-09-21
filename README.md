@@ -4,6 +4,9 @@ Módulo técnico para Odoo 18 que emite documentos tributarios electrónicos (DT
 ante el Servicio de Impuestos Internos (SII) de Chile usando la librería
 [`facturacion_electronica`](https://gitlab.com/dansanti/facturacion_electronica) 0.24.0.
 
+Versión 18.0.2.3.0. Es independiente de la localización oficial de Odoo
+(`l10n_cl`, `l10n_latam_base`, `l10n_latam_invoice_document`).
+
 ## Alcance
 
 | Documento | Código | Modelo |
@@ -18,6 +21,25 @@ Fuera de alcance: boletas (39/41), punto de venta, factura de compra (46),
 liquidación-factura (43), exportación (110/111/112), RCOF, libros y cesión.
 El intercambio de DTE con el receptor está planificado para una segunda fase.
 
+## Módulos relacionados
+
+| Módulo | Para qué | Recomendación |
+|---|---|---|
+| **`tf_l10n_cl`** | Plan de cuentas, impuestos, grupos de impuestos, posiciones fiscales, reporte de impuestos, bancos y contactos del SII y la Tesorería, como paquete de localización **«Chile (TF)»**. Deja los impuestos de venta con su código SII listo para emitir. | Instalar junto con este módulo |
+| **`account_usability`** (OCA, repositorio `account-financial-tools`) | En Odoo Community, el plan de cuentas y otros menús contables están ocultos tras el grupo técnico «Show Full Accounting Features». Este módulo los muestra y permite asignar el grupo desde la ficha del usuario. | Recomendado en Community |
+
+### Por qué no usar `l10n_cl`
+
+El plan de cuentas oficial viene en `l10n_cl`, que a su vez instala
+`l10n_latam_base` y `l10n_latam_invoice_document`. Estos módulos agregan a
+facturas, diarios y contactos campos propios como *Tipo de documento* y
+*Número de documento*, que no usa este módulo y que llevan a pensar que el folio
+se ingresa a mano. En este módulo el folio se asigna automáticamente al
+confirmar y se muestra en el campo **Folio SII**.
+
+`tf_l10n_cl` reemplaza a `l10n_cl` en lo contable, a partir de la misma
+plantilla oficial de Odoo 18, sin sus dependencias.
+
 ## Instalación
 
 ```bash
@@ -25,9 +47,33 @@ pip install facturacion-electronica==0.24.0
 ```
 
 Dependencias Odoo: `account`, `account_edi`, `stock`, `sale_stock`, `contacts`.
-El catálogo de 346 comunas se carga al instalar (`hooks._tf_dte_cl_load_comunas`);
-si alguna región no se empareja por nombre, la comuna queda sin región y se
-informa en el log del servidor.
+
+### En una base nueva
+
+Odoo instala `l10n_cl` automáticamente si Contabilidad se instala en una
+compañía chilena. Para evitarlo:
+
+1. Crear la base sin datos de demostración y **sin país** (o con uno distinto de Chile).
+2. Instalar `tf_dte_cl`, que instala Contabilidad con el plan genérico.
+3. En la compañía: país **Chile**, RUT, dirección y moneda **CLP**. La moneda
+   debe cambiarse antes de registrar cualquier asiento.
+4. Instalar `tf_l10n_cl` y elegir **Chile (TF)** en
+   *Facturación > Ajustes > Localización fiscal*. Si el paquete no aparece en
+   el selector, se puede cargar desde la consola:
+   `env['account.chart.template'].try_loading('cl_tf', env.company)`.
+5. En Community, instalar `account_usability` (OCA).
+6. Verificar en Aplicaciones que `l10n_cl` y los módulos `l10n_latam_*` **no**
+   estén instalados.
+
+### Catálogos incluidos
+
+Se cargan al instalar o actualizar, solo con los registros que falten:
+
+- **Comunas:** 346 comunas con su código y región (`hooks._tf_dte_cl_load_comunas`).
+  Si una región no se empareja por nombre, la comuna queda sin región y se
+  informa en el log.
+- **Actividades económicas:** 674 actividades del SII (`data/sii_activities.csv`).
+- **Tipos de documento de referencia:** catálogo oficial del formato DTE.
 
 ## Configuración
 
@@ -41,8 +87,9 @@ informa en el log del servidor.
    servidor necesita el proveedor *legacy* de OpenSSL 3.
 3. **CAF**: Contabilidad > Configuración > Facturación electrónica Chile > CAF.
    Se validan tipo, RUT, rango, solapamiento, llaves y codificación.
-4. **Impuestos de venta**: asignar el código SII (14, 17, 18, 24, 25, 26, 27,
-   271). La tasa debe ser la oficial y el impuesto no puede estar incluido en el precio.
+4. **Impuestos de venta**: con `tf_l10n_cl` ya vienen con su código SII. Si se
+   crean a mano, asignar el código (14, 17, 18, 24, 25, 26, 27, 271): la tasa
+   debe ser la oficial y el impuesto no puede estar incluido en el precio.
 5. **Diarios de venta**: un diario por tipo (33, 34, 56, 61), con sucursal opcional.
 6. **Tipos de operación** (entregas o traslados internos): tipo 52 e indicadores
    de traslado y despacho por defecto.
@@ -58,6 +105,7 @@ informa en el log del servidor.
 | `models/caf.py` | CAF, asignación de folios con bloqueo de fila y folios por anular. |
 | `models/envelope.py` | Sobres EnvioDTE e intentos de envío. |
 | `models/reference.py`, `models/document_type.py` | Referencias (zona E del formato DTE) y su catálogo oficial. |
+| `models/ir_actions_report.py`, `report/` | Impresión: formato DTE en hoja y papel continuo, copia cedible y papel compacto para el reporte estándar de facturas. |
 | `models/certificate.py` | Certificado PKCS#12. |
 | `models/res_company.py`, `models/res_config_settings.py` | Configuración del emisor. |
 | `models/account_move.py`, `models/account_edi_format.py` | Facturas y notas sobre `account_edi`. |
@@ -81,6 +129,20 @@ informa en el log del servidor.
 En Odoo 18 el cron de `account_edi` viene inactivo; por eso el módulo tiene su
 propio cron de envío y mantiene sincronizado el documento EDI.
 
+## Impresión
+
+El formato sigue el *Manual de muestras impresas* del SII (versión 4.0). Los
+botones **Imprimir**, **Descargar > PDF** y **Enviar** de las facturas usan el
+formato DTE cuando el documento tiene folio; las facturas sin folio siguen con
+el formato estándar de Odoo. Hay además una versión para papel continuo de 80 mm.
+
+- Recuadro con RUT, tipo y folio (7,5 cm de ancho) y la unidad regional del SII debajo.
+- Timbre de 9 × 4 cm como máximo, a más de 2 cm del borde izquierdo, con la
+  leyenda de la resolución.
+- Descuento por línea en monto, totales con la tasa de IVA.
+- **Copia cedible** en facturas 33 y 34, y en guías que constituyen venta, con
+  el acuse de recibo de la Ley 19.983. Se desactiva en Ajustes.
+
 ## Límites conocidos (facturacion_electronica 0.24.0)
 
 - Referencias globales (`IndGlobal`) y RUT de otro contribuyente (`RUTOtr`):
@@ -97,11 +159,17 @@ propio cron de envío y mantiene sincronizado el documento EDI.
 - Una nota debe llevar `CodRef` en al menos una referencia a un documento tributario.
 - Sin Track ID, un documento con estado `DOK` (o modificado por una nota) se da por aceptado.
 - Guías valorizadas: precio de venta, precio de lista o 1 (con aviso en el chatter).
+- Copia cedible de guías solo con indicador de traslado 1 (operación constituye venta).
 
-## Pendiente antes de producción
+## Estado y pendientes
 
-- Pruebas en el ambiente de certificación del SII y proceso de certificación.
-- Revisar la representación impresa contra el Manual de muestras impresas vigente.
+Probado en producción: factura electrónica (33) y nota de crédito (61)
+aceptadas por el SII.
+
+Pendiente:
+
+- Probar factura exenta (34), nota de débito (56) y guía de despacho (52).
+- Validar la impresión con documentos reales contra el manual de muestras impresas.
 - Intercambio de DTE con el receptor.
 - Suite de pruebas de Odoo (`tests/`).
 

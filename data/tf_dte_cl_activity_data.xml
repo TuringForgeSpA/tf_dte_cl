@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: data/tf_dte_cl_activity_data.xml
+     Se ejecuta en cada instalación y actualización; solo agrega actividades faltantes. -->
+<odoo>
+    <function model="tf_dte_cl.activity" name="_tf_dte_cl_load_catalog"/>
+</odoo>

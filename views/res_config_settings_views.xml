@@ -102,6 +102,10 @@
                                 <label for="tf_dte_cl_print_logo" class="col-lg-4 o_light_label"/>
                                 <field name="tf_dte_cl_print_logo"/>
                             </div>
+                            <div class="row">
+                                <label for="tf_dte_cl_print_cedible" class="col-lg-4 o_light_label"/>
+                                <field name="tf_dte_cl_print_cedible"/>
+                            </div>
                         </div>
                     </setting>
 

@@ -21,6 +21,7 @@ import base64
 import logging
 from collections import OrderedDict
 from datetime import date, timedelta
+from decimal import Decimal
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError
@@ -527,6 +528,14 @@ class TfDteClDocumentMixin(models.AbstractModel):
     def _tf_dte_cl_format_amount(self, amount) -> str:
         return '$ ' + '{:,}'.format(round_half_up(amount or 0)).replace(',', '.')
 
+    @api.model
+    def _tf_dte_cl_format_qty(self, quantity) -> str:
+        """1.0 → '1'; 2.5 → '2,5' (hasta 4 decimales, sin ceros sobrantes)."""
+        text = ('%.4f' % (quantity or 0)).rstrip('0').rstrip('.')
+        integer, _sep, decimals = text.partition('.')
+        integer = '{:,}'.format(int(integer)).replace(',', '.')
+        return integer + (',' + decimals if decimals else '')
+
     def _tf_dte_cl_print_totals(self) -> list[tuple[str, int]]:
         self.ensure_one()
         totals = compute_totals(self._tf_dte_cl_line_infos())
@@ -538,8 +547,46 @@ class TfDteClDocumentMixin(models.AbstractModel):
         for code, (rate, amount) in totals['taxes'].items():
             name = SII_TAXES.get(code, (code,))[0]
             rows.append(('%s %s%%' % (name, ('%g' % rate).replace('.', ',')), amount))
-        rows.append((self.env._('Total'), totals['total']))
+        rows.append((self.env._('Monto total'), totals['total']))
         return rows
+
+    # Manual de muestras impresas SII v4.0: copia cedible en 33, 34 y 52 (las notas no la llevan).
+    CEDIBLE_DOCUMENT_TYPES = ('33', '34', '52')
+
+    def _tf_dte_cl_allows_cedible(self) -> bool:
+        self.ensure_one()
+        return self.tf_dte_cl_document_type in self.CEDIBLE_DOCUMENT_TYPES
+
+    def _tf_dte_cl_print_copies(self) -> list[bool]:
+        """Copias a imprimir: la tributaria y, si corresponde, la cedible."""
+        self.ensure_one()
+        copies = [False]
+        if self.company_id.tf_dte_cl_print_cedible and self._tf_dte_cl_allows_cedible():
+            copies.append(True)
+        return copies
+
+    def _tf_dte_cl_cedible_legend(self) -> str:
+        self.ensure_one()
+        return 'CEDIBLE CON SU FACTURA' if self.tf_dte_cl_document_type == '52' else 'CEDIBLE'
+
+    def _tf_dte_cl_sii_office_label(self) -> str:
+        self.ensure_one()
+        office = (self.company_id.tf_dte_cl_sii_office or '').strip()
+        if not office:
+            return ''
+        return office if office.upper().startswith('S.I.I') else 'S.I.I. - %s' % office
+
+    @api.model
+    def _tf_dte_cl_has_discount(self, lines) -> bool:
+        return any(line.discount for line in lines)
+
+    @api.model
+    def _tf_dte_cl_line_discount(self, line) -> int:
+        """Monto de descuento de la línea, como lo informa el DTE (DescuentoMonto)."""
+        if not line.discount:
+            return 0
+        gross = round_half_up(Decimal(str(line.quantity)) * Decimal(str(round(line.price_unit, 4))))
+        return max(gross - round_half_up(line.subtotal), 0)
 
     def _tf_dte_cl_resolution_text(self) -> str:
         self.ensure_one()

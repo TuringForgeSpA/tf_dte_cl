@@ -189,7 +189,8 @@ class StockPicking(models.Model):
             infos.append(LineInfo(
                 label=move.product_id.display_name,
                 product_name=move.product_id.name,
-                description=move.description_picking or '',
+                description='' if (move.description_picking or '').strip() in (
+                    '', move.product_id.name, move.product_id.display_name) else move.description_picking,
                 default_code=move.product_id.default_code or '',
                 quantity=move.quantity,
                 uom=move.product_uom.name or '',
@@ -257,6 +258,11 @@ class StockPicking(models.Model):
         if rate:
             values['TasaIVA'] = rate
         return values
+
+    def _tf_dte_cl_allows_cedible(self) -> bool:
+        # Manual de muestras impresas: una guía de traslado interno o de una operación
+        # que no constituye venta no lleva ejemplar cedible.
+        return self.tf_dte_cl_transfer_type == '1'
 
     def _tf_dte_cl_expected_amounts(self) -> dict:
         # La guía no genera asientos: se verifican las bases calculadas desde los movimientos.

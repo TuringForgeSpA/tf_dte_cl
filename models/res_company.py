@@ -52,6 +52,11 @@ class ResCompany(models.Model):
         string='Formato de impresión', default='a4', required=True,
     )
     tf_dte_cl_print_logo = fields.Boolean(string='Imprimir logo en el DTE', default=True)
+    tf_dte_cl_print_cedible = fields.Boolean(
+        string='Imprimir copia cedible', default=True,
+        help='Agrega una segunda página con el acuse de recibo (Ley 19.983) en facturas y en '
+             'guías que constituyen venta.',
+    )
     tf_dte_cl_caf_validity_months = fields.Integer(
         string='Vigencia de CAF (meses)', default=6,
         help='Plazo desde la fecha de autorización tras el cual un CAF deja de usarse. '

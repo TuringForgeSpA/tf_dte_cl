@@ -1,56 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Ruta real: report/report_templates.xml
-     Representación impresa de facturas, notas y guías. Antes de certificar,
-     revisar contra el "Manual de muestras impresas" vigente del SII. -->
+     Representación impresa según el "Manual de muestras impresas" del SII,
+     versión 4.0 (julio 2014). Esperan "o" (documento) y "company" en el contexto. -->
 <odoo>
 
     <!-- ============================================================
-         Bloques compartidos (esperan "o" y "company" en el contexto)
+         Formato hoja (A4)
          ============================================================ -->
 
+    <!-- Zona superior: emisor a la izquierda; recuadro y unidad SII a la derecha (1.1.4, 1.1.7). -->
     <template id="dte_header">
         <div class="row mb-3">
             <div class="col-7">
                 <img t-if="company.tf_dte_cl_print_logo and company.logo"
-                     t-att-src="image_data_uri(company.logo)" style="max-height: 60px;" alt="Logo"/>
-                <h5 class="mt-2 mb-0 text-uppercase fw-bold" t-out="company.name"/>
-                <div class="small text-uppercase" t-out="company.tf_dte_cl_giro"/>
+                     t-att-src="image_data_uri(company.logo)" style="max-height: 55px; max-width: 5cm;" alt="Logo"/>
+                <div class="mt-2 text-uppercase fw-bold" style="font-size: 15px;" t-out="company.name"/>
+                <div class="small" t-out="company.tf_dte_cl_giro"/>
                 <div class="small">
-                    <span t-out="company.street"/>
-                    <t t-if="company.tf_dte_cl_comuna_id">, <span t-out="company.tf_dte_cl_comuna_id.name"/></t>
-                    <t t-if="company.city">, <span t-out="company.city"/></t>
+                    Casa Matriz: <span t-out="company.street"/><t t-if="company.street2">, <span t-out="company.street2"/></t><t t-if="company.tf_dte_cl_comuna_id">, <span t-out="company.tf_dte_cl_comuna_id.name"/></t><t t-if="company.city">, <span t-out="company.city"/></t>
                 </div>
                 <t t-set="branch" t-value="o._tf_dte_cl_get_branch()"/>
                 <div class="small" t-if="branch and branch.street">
-                    Sucursal: <span t-out="branch.street"/>
-                    <t t-if="branch.comuna_id">, <span t-out="branch.comuna_id.name"/></t>
-                    <t t-if="branch.city">, <span t-out="branch.city"/></t>
+                    Sucursal: <span t-out="branch.street"/><t t-if="branch.comuna_id">, <span t-out="branch.comuna_id.name"/></t><t t-if="branch.city">, <span t-out="branch.city"/></t>
                 </div>
                 <div class="small">
                     <t t-if="company.phone">Teléfono: <span t-out="company.phone"/></t>
-                    <t t-if="company.tf_dte_cl_dte_email or company.email">
-                        · <span t-out="company.tf_dte_cl_dte_email or company.email"/>
-                    </t>
+                    <t t-if="company.tf_dte_cl_dte_email or company.email"> · <span t-out="company.tf_dte_cl_dte_email or company.email"/></t>
                 </div>
             </div>
-            <div class="col-5 text-center">
-                <div style="border: 3px solid #d00; color: #d00; padding: 8px;">
-                    <div class="fw-bold fs-5">R.U.T.: <span t-out="o._tf_dte_cl_format_rut(company.vat)"/></div>
-                    <div class="fw-bold fs-5 text-uppercase" t-out="o._tf_dte_cl_document_name()"/>
-                    <div class="fw-bold fs-5">N° <span t-out="o.tf_dte_cl_folio"/></div>
+            <div class="col-5">
+                <!-- Recuadro: entre 1,5x5,5 y 4x8 cm, filete de 0,5 a 1 mm, letra de 10 pt o más en negrita. -->
+                <div style="width: 7.5cm; margin-left: auto; border: 0.8mm solid #d00; color: #d00;
+                            padding: 2mm 1mm; text-align: center; font-weight: bold; font-size: 12pt; line-height: 1.35;">
+                    <div>R.U.T.: <span t-out="o._tf_dte_cl_format_rut(company.vat)"/></div>
+                    <div class="text-uppercase" t-out="o._tf_dte_cl_document_name()"/>
+                    <div>N° <span t-out="o.tf_dte_cl_folio"/></div>
                 </div>
-                <div class="small text-uppercase mt-1" style="color: #d00;" t-out="company.tf_dte_cl_sii_office"/>
+                <div style="width: 7.5cm; margin-left: auto; text-align: center; color: #d00; font-size: 9pt;"
+                     class="text-uppercase mt-1" t-out="o._tf_dte_cl_sii_office_label()"/>
             </div>
         </div>
     </template>
 
+    <!-- Fecha y receptor (1.3). El cuerpo de la llamada agrega una celda extra a la última fila. -->
     <template id="dte_receiver">
         <t t-set="receiver" t-value="o._tf_dte_cl_get_receiver()"/>
         <t t-set="commercial" t-value="receiver.commercial_partner_id"/>
         <table class="table table-sm table-borderless border border-dark mb-3 small">
             <tr>
-                <td class="fw-bold" style="width: 18%;">Señor(es):</td>
-                <td style="width: 42%;" t-out="commercial.name"/>
+                <td class="fw-bold" style="width: 16%;">Señor(es):</td>
+                <td style="width: 44%;" t-out="commercial.name"/>
                 <td class="fw-bold" style="width: 18%;">Fecha emisión:</td>
                 <td t-out="o.tf_dte_cl_emission_date" t-options="{'widget': 'date'}"/>
             </tr>
@@ -74,133 +73,175 @@
         </table>
     </template>
 
+    <!-- Referencias: tipo en palabras, folio, fecha y motivo (1.1.7, 1.4). -->
     <template id="dte_references">
         <t t-set="references" t-value="o._tf_dte_cl_get_references()"/>
-        <table t-if="references" class="table table-sm border border-dark mb-3 small">
-            <thead>
-                <tr><th>Documento de referencia</th><th>Folio</th><th>Fecha</th><th>Motivo</th></tr>
-            </thead>
-            <tbody>
-                <tr t-foreach="references" t-as="ref">
-                    <td t-out="ref.document_type_id.name"/>
-                    <td t-out="ref.folio"/>
-                    <td t-out="ref.date" t-options="{'widget': 'date'}"/>
-                    <td>
-                        <t t-if="ref.code"><span t-field="ref.code"/><t t-if="ref.reason">: </t></t>
-                        <span t-out="ref.reason"/>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <t t-if="references">
+            <div class="small fw-bold mb-1">Referencias a otros documentos</div>
+            <table class="table table-sm border border-dark mb-3 small">
+                <thead>
+                    <tr><th>Tipo documento</th><th>Folio</th><th>Fecha</th><th>Razón referencia</th></tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="references" t-as="ref">
+                        <td t-out="ref.document_type_id.name"/>
+                        <td t-out="ref.folio"/>
+                        <td t-out="ref.date" t-options="{'widget': 'date'}"/>
+                        <td>
+                            <t t-if="ref.code"><span t-field="ref.code"/><t t-if="ref.reason">: </t></t>
+                            <span t-out="ref.reason"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </t>
     </template>
 
+    <!-- Detalle: el descuento por línea se informa en monto; el porcentaje es opcional (1.4). -->
     <template id="dte_lines">
+        <t t-set="lines" t-value="o._tf_dte_cl_line_infos()"/>
+        <t t-set="show_discount" t-value="o._tf_dte_cl_has_discount(lines)"/>
         <table class="table table-sm small">
             <thead>
                 <tr>
-                    <th>Código</th><th>Detalle</th><th class="text-end">Cantidad</th>
-                    <th>Unidad</th><th class="text-end">Precio</th>
-                    <th class="text-end">Desc. %</th><th class="text-end">Total</th>
+                    <th>Código</th><th>Descripción</th><th class="text-end">Cantidad</th><th>Unid.</th>
+                    <th class="text-end">P. unitario</th>
+                    <th t-if="show_discount" class="text-end">Desc. %</th>
+                    <th t-if="show_discount" class="text-end">$ Dscto.</th>
+                    <th class="text-end">Valor</th>
                 </tr>
             </thead>
             <tbody>
-                <tr t-foreach="o._tf_dte_cl_line_infos()" t-as="line">
+                <tr t-foreach="lines" t-as="line">
                     <td t-out="line.default_code"/>
                     <td>
                         <span t-out="line.product_name"/>
                         <t t-if="line.is_exempt"> <em>(exento)</em></t>
-                        <div t-if="line.description and line.description != line.product_name"
-                             class="text-muted" t-out="line.description"/>
+                        <div t-if="line.description" class="text-muted" t-out="line.description"/>
                     </td>
-                    <td class="text-end" t-out="line.quantity"/>
+                    <td class="text-end" t-out="o._tf_dte_cl_format_qty(line.quantity)"/>
                     <td t-out="line.uom"/>
                     <td class="text-end" t-out="o._tf_dte_cl_format_amount(line.price_unit)"/>
-                    <td class="text-end"><t t-if="line.discount" t-out="line.discount"/></td>
+                    <td t-if="show_discount" class="text-end"><t t-if="line.discount" t-out="o._tf_dte_cl_format_qty(line.discount)"/></td>
+                    <td t-if="show_discount" class="text-end">
+                        <t t-if="line.discount" t-out="o._tf_dte_cl_format_amount(o._tf_dte_cl_line_discount(line))"/>
+                    </td>
                     <td class="text-end" t-out="o._tf_dte_cl_format_amount(line.subtotal)"/>
                 </tr>
             </tbody>
         </table>
     </template>
 
+    <template id="dte_totals">
+        <table class="table table-sm small mb-0">
+            <tr t-foreach="o._tf_dte_cl_print_totals()" t-as="row"
+                t-attf-class="{{ 'fw-bold border-top border-dark' if row_last else '' }}">
+                <td t-out="row[0]"/>
+                <td class="text-end" t-out="o._tf_dte_cl_format_amount(row[1])"/>
+            </tr>
+        </table>
+    </template>
+
+    <!-- Timbre: entre 2x5 y 4x9 cm, a 2 cm o más del borde izquierdo, con margen en blanco (1.5).
+         Se limita con max-width/max-height para no deformar el código PDF417. -->
+    <template id="dte_stamp">
+        <div t-if="o.tf_dte_cl_barcode" t-att-style="stamp_style">
+            <div style="display: inline-block; text-align: center; padding: 2mm;">
+                <img t-att-src="image_data_uri(o.tf_dte_cl_barcode)" alt="Timbre electrónico"
+                     t-att-style="stamp_img_style"/>
+                <div style="font-size: 8pt;">Timbre Electrónico SII</div>
+                <div style="font-size: 8pt;"><span t-out="o._tf_dte_cl_resolution_text()"/> - Verifique documento: www.sii.cl</div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Acuse de recibo, solo en la copia cedible (1.4, Res. Ex. SII N° 51 de 2005). -->
+    <template id="dte_receipt">
+        <div style="border: 1px solid #000; padding: 2mm; font-size: 8pt;">
+            <div class="fw-bold mb-1">Acuse de Recibo</div>
+            <div class="mb-1">Nombre: ______________________________________________</div>
+            <div class="mb-1">R.U.T.: ____________________  Fecha: ____________________</div>
+            <div class="mb-1">Recinto: ___________________  Firma: ____________________</div>
+            <div>El acuse de recibo que se declara en este acto, de acuerdo a lo dispuesto en la letra b)
+                del Art. 4°, y la letra c) del Art. 5° de la Ley 19.983, acredita que la entrega de
+                mercaderías o servicio (s) prestado (s) ha (n) sido recibido (s).</div>
+        </div>
+    </template>
+
+    <!-- Zona inferior: totales, acuse de recibo (cedible), timbre y leyenda de destino (1.1.7). -->
     <template id="dte_footer">
-        <div class="row mt-3">
-            <div class="col-6 text-center">
-                <t t-if="o.tf_dte_cl_barcode">
-                    <img t-att-src="image_data_uri(o.tf_dte_cl_barcode)" style="max-width: 100%;" alt="Timbre electrónico"/>
-                    <div class="small">Timbre Electrónico SII</div>
-                    <div class="small"><span t-out="o._tf_dte_cl_resolution_text()"/> · Verifique documento: www.sii.cl</div>
+        <div class="row mt-2">
+            <div class="col-5 offset-7"><t t-call="tf_dte_cl.dte_totals"/></div>
+        </div>
+        <div class="row mt-3" style="page-break-inside: avoid;">
+            <div class="col-6">
+                <t t-call="tf_dte_cl.dte_stamp">
+                    <t t-set="stamp_style" t-value="'padding-left: 1.5cm;'"/>
+                    <t t-set="stamp_img_style" t-value="'max-width: 9cm; max-height: 4cm;'"/>
                 </t>
             </div>
-            <div class="col-5 offset-1">
-                <table class="table table-sm small">
-                    <tr t-foreach="o._tf_dte_cl_print_totals()" t-as="row"
-                        t-attf-class="{{ 'fw-bold border-top border-dark' if row_last else '' }}">
-                        <td t-out="row[0]"/>
-                        <td class="text-end" t-out="o._tf_dte_cl_format_amount(row[1])"/>
-                    </tr>
-                </table>
-            </div>
+            <div class="col-6" t-if="cedible"><t t-call="tf_dte_cl.dte_receipt"/></div>
         </div>
+        <div t-if="cedible" class="text-end fw-bold mt-2" style="font-size: 12pt;" t-out="o._tf_dte_cl_cedible_legend()"/>
     </template>
 
-    <template id="dte_thermal_body">
-        <div style="font-size: 10px; width: 100%;">
-            <div class="text-center">
-                <div class="fw-bold text-uppercase" t-out="company.name"/>
-                <div>R.U.T.: <span t-out="o._tf_dte_cl_format_rut(company.vat)"/></div>
-                <div class="fw-bold text-uppercase" t-out="o._tf_dte_cl_document_name()"/>
-                <div class="fw-bold">N° <span t-out="o.tf_dte_cl_folio"/></div>
-                <div class="text-uppercase" t-out="company.tf_dte_cl_sii_office"/>
-            </div>
-            <t t-set="receiver" t-value="o._tf_dte_cl_get_receiver().commercial_partner_id"/>
-            <div class="mt-2">
-                <div>Fecha: <span t-out="o.tf_dte_cl_emission_date" t-options="{'widget': 'date'}"/></div>
-                <div>Señor(es): <span t-out="receiver.name"/></div>
-                <div>R.U.T.: <span t-out="o._tf_dte_cl_format_rut(receiver.vat)"/></div>
-            </div>
-            <table style="width: 100%;" class="mt-2">
-                <tr t-foreach="o._tf_dte_cl_line_infos()" t-as="line">
-                    <td><span t-out="line.quantity"/> x <span t-out="line.product_name"/></td>
-                    <td class="text-end" t-out="o._tf_dte_cl_format_amount(line.subtotal)"/>
-                </tr>
-            </table>
-            <table style="width: 100%;" class="mt-2">
-                <tr t-foreach="o._tf_dte_cl_print_totals()" t-as="row"
-                    t-attf-class="{{ 'fw-bold' if row_last else '' }}">
-                    <td t-out="row[0]"/>
-                    <td class="text-end" t-out="o._tf_dte_cl_format_amount(row[1])"/>
-                </tr>
-            </table>
-            <div class="text-center mt-2" t-if="o.tf_dte_cl_barcode">
-                <img t-att-src="image_data_uri(o.tf_dte_cl_barcode)" style="max-width: 100%;" alt="Timbre electrónico"/>
-                <div>Timbre Electrónico SII</div>
-                <div><span t-out="o._tf_dte_cl_resolution_text()"/> · Verifique documento: www.sii.cl</div>
-            </div>
-        </div>
+    <!-- Una copia del documento; "cedible" define si lleva acuse y leyenda. -->
+    <template id="dte_move_copy">
+        <t t-call="tf_dte_cl.dte_header"/>
+        <t t-call="tf_dte_cl.dte_receiver">
+            <td class="fw-bold">Condición de pago:</td>
+            <td>
+                <t t-if="o.invoice_date_due and o.invoice_date_due &gt; o.tf_dte_cl_emission_date">
+                    Crédito, vence <span t-out="o.invoice_date_due" t-options="{'widget': 'date'}"/>
+                </t>
+                <t t-else="">Contado</t>
+            </td>
+        </t>
+        <t t-call="tf_dte_cl.dte_references"/>
+        <t t-call="tf_dte_cl.dte_lines"/>
+        <t t-call="tf_dte_cl.dte_footer"/>
     </template>
 
-    <!-- ============================================================
-         Facturas y notas
-         ============================================================ -->
+    <template id="dte_picking_copy">
+        <t t-call="tf_dte_cl.dte_header"/>
+        <t t-call="tf_dte_cl.dte_receiver">
+            <td class="fw-bold">Tipo de traslado:</td>
+            <td t-field="o.tf_dte_cl_transfer_type"/>
+        </t>
+        <table class="table table-sm table-borderless border border-dark mb-3 small">
+            <tr>
+                <td class="fw-bold" style="width: 16%;">Despacho:</td>
+                <td style="width: 44%;" t-field="o.tf_dte_cl_dispatch_type"/>
+                <td class="fw-bold" style="width: 18%;">Patente:</td>
+                <td t-out="o.tf_dte_cl_vehicle_plate"/>
+            </tr>
+            <tr>
+                <td class="fw-bold">Destino:</td>
+                <td>
+                    <span t-out="o.tf_dte_cl_dest_street"/><t t-if="o.tf_dte_cl_dest_comuna_id">, <span t-out="o.tf_dte_cl_dest_comuna_id.name"/></t><t t-if="o.tf_dte_cl_dest_city">, <span t-out="o.tf_dte_cl_dest_city"/></t>
+                </td>
+                <td class="fw-bold">Transportista:</td>
+                <td>
+                    <span t-out="o.tf_dte_cl_carrier_id.name"/>
+                    <t t-if="o.tf_dte_cl_driver_name"> · Chofer: <span t-out="o.tf_dte_cl_driver_name"/></t>
+                </td>
+            </tr>
+        </table>
+        <t t-call="tf_dte_cl.dte_references"/>
+        <t t-call="tf_dte_cl.dte_lines"/>
+        <t t-call="tf_dte_cl.dte_footer"/>
+    </template>
 
+    <!-- Documento completo: copia tributaria y, si corresponde, cedible en la página siguiente.
+         Un solo artículo por registro, para que Odoo asocie correctamente el PDF al documento. -->
     <template id="report_move_dte_document">
         <t t-call="web.basic_layout">
             <t t-set="company" t-value="o.company_id"/>
             <div class="page">
-                <t t-call="tf_dte_cl.dte_header"/>
-                <t t-call="tf_dte_cl.dte_receiver">
-                    <td class="fw-bold">Condición de pago:</td>
-                    <td>
-                        <t t-if="o.invoice_date_due and o.invoice_date_due &gt; o.tf_dte_cl_emission_date">
-                            Crédito, vence <span t-out="o.invoice_date_due" t-options="{'widget': 'date'}"/>
-                        </t>
-                        <t t-else="">Contado</t>
-                    </td>
+                <t t-foreach="o._tf_dte_cl_print_copies()" t-as="cedible">
+                    <div t-if="not cedible_first" style="page-break-before: always;"/>
+                    <t t-call="tf_dte_cl.dte_move_copy"/>
                 </t>
-                <t t-call="tf_dte_cl.dte_references"/>
-                <t t-call="tf_dte_cl.dte_lines"/>
-                <div t-if="o.narration" class="small border p-2" t-field="o.narration"/>
-                <t t-call="tf_dte_cl.dte_footer"/>
             </div>
         </t>
     </template>
@@ -213,57 +254,14 @@
         </t>
     </template>
 
-    <template id="report_move_dte_thermal">
-        <t t-call="web.html_container">
-            <t t-foreach="docs.filtered('tf_dte_cl_folio')" t-as="o">
-                <t t-set="company" t-value="o.company_id"/>
-                <div class="page"><t t-call="tf_dte_cl.dte_thermal_body"/></div>
-            </t>
-        </t>
-    </template>
-
-    <!-- ============================================================
-         Guías de despacho
-         ============================================================ -->
-
     <template id="report_picking_dte_document">
         <t t-call="web.basic_layout">
             <t t-set="company" t-value="o.company_id"/>
             <div class="page">
-                <t t-call="tf_dte_cl.dte_header"/>
-                <t t-call="tf_dte_cl.dte_receiver">
-                    <td class="fw-bold">Traslado:</td>
-                    <td t-field="o.tf_dte_cl_transfer_type"/>
+                <t t-foreach="o._tf_dte_cl_print_copies()" t-as="cedible">
+                    <div t-if="not cedible_first" style="page-break-before: always;"/>
+                    <t t-call="tf_dte_cl.dte_picking_copy"/>
                 </t>
-                <table class="table table-sm table-borderless border border-dark mb-3 small">
-                    <tr>
-                        <td class="fw-bold" style="width: 18%;">Despacho:</td>
-                        <td style="width: 42%;" t-field="o.tf_dte_cl_dispatch_type"/>
-                        <td class="fw-bold" style="width: 18%;">Patente:</td>
-                        <td t-out="o.tf_dte_cl_vehicle_plate"/>
-                    </tr>
-                    <tr>
-                        <td class="fw-bold">Destino:</td>
-                        <td>
-                            <span t-out="o.tf_dte_cl_dest_street"/>,
-                            <span t-out="o.tf_dte_cl_dest_comuna_id.name"/>
-                            <t t-if="o.tf_dte_cl_dest_city">, <span t-out="o.tf_dte_cl_dest_city"/></t>
-                        </td>
-                        <td class="fw-bold">Transportista:</td>
-                        <td>
-                            <span t-out="o.tf_dte_cl_carrier_id.name"/>
-                            <t t-if="o.tf_dte_cl_driver_name"> · Chofer: <span t-out="o.tf_dte_cl_driver_name"/></t>
-                        </td>
-                    </tr>
-                </table>
-                <t t-call="tf_dte_cl.dte_references"/>
-                <t t-call="tf_dte_cl.dte_lines"/>
-                <t t-call="tf_dte_cl.dte_footer"/>
-                <table class="table table-sm border border-dark small mt-3">
-                    <tr><td style="width: 50%;">Nombre:</td><td>R.U.T.:</td></tr>
-                    <tr><td>Fecha:</td><td>Recinto:</td></tr>
-                    <tr><td colspan="2" style="height: 40px;">Firma:</td></tr>
-                </table>
             </div>
         </t>
     </template>
@@ -276,13 +274,125 @@
         </t>
     </template>
 
+    <!-- ============================================================
+         Papel continuo (térmico 80 mm), en el orden del manual (1.1.7)
+         ============================================================ -->
+
+    <template id="dte_thermal_copy">
+        <div style="font-size: 9pt; width: 100%;">
+            <!-- 1-2. Recuadro centrado y unidad SII -->
+            <div style="border: 0.8mm solid #d00; color: #d00; text-align: center; font-weight: bold;
+                        font-size: 10pt; padding: 1.5mm; margin: 0 4mm;">
+                <div>R.U.T.: <span t-out="o._tf_dte_cl_format_rut(company.vat)"/></div>
+                <div class="text-uppercase" t-out="o._tf_dte_cl_document_name()"/>
+                <div>N° <span t-out="o.tf_dte_cl_folio"/></div>
+            </div>
+            <div class="text-center text-uppercase" style="color: #d00;" t-out="o._tf_dte_cl_sii_office_label()"/>
+            <div class="text-center mt-1" t-if="company.tf_dte_cl_print_logo and company.logo">
+                <img t-att-src="image_data_uri(company.logo)" style="max-height: 40px;" alt="Logo"/>
+            </div>
+            <!-- 3. Emisor -->
+            <div class="mt-2">
+                <div class="fw-bold text-uppercase" t-out="company.name"/>
+                <div>Giro: <span t-out="company.tf_dte_cl_giro"/></div>
+                <div>Casa Matriz: <span t-out="company.street"/><t t-if="company.tf_dte_cl_comuna_id">, <span t-out="company.tf_dte_cl_comuna_id.name"/></t></div>
+                <t t-set="branch" t-value="o._tf_dte_cl_get_branch()"/>
+                <div t-if="branch and branch.street">Sucursal: <span t-out="branch.street"/><t t-if="branch.comuna_id">, <span t-out="branch.comuna_id.name"/></t></div>
+            </div>
+            <!-- 4. Receptor -->
+            <t t-set="receiver" t-value="o._tf_dte_cl_get_receiver()"/>
+            <t t-set="commercial" t-value="receiver.commercial_partner_id"/>
+            <div class="mt-2">
+                <div class="fw-bold text-uppercase" t-out="commercial.name"/>
+                <div>R.U.T.: <span t-out="o._tf_dte_cl_format_rut(commercial.vat)"/></div>
+                <div>Giro: <span t-out="commercial.tf_dte_cl_giro"/></div>
+                <div>Dirección: <span t-out="receiver.street"/><t t-if="receiver.tf_dte_cl_comuna_id">, <span t-out="receiver.tf_dte_cl_comuna_id.name"/></t></div>
+            </div>
+            <!-- 5. Fecha de emisión -->
+            <div class="mt-2 fw-bold">Fecha de emisión: <span t-out="o.tf_dte_cl_emission_date" t-options="{'widget': 'date'}"/></div>
+            <div t-if="o._name == 'stock.picking'">Tipo de traslado: <span t-field="o.tf_dte_cl_transfer_type"/></div>
+            <!-- 6. Referencias -->
+            <t t-set="references" t-value="o._tf_dte_cl_get_references()"/>
+            <div t-if="references" class="mt-2">
+                <div class="fw-bold">Documentos de referencia</div>
+                <div t-foreach="references" t-as="ref" class="mb-1">
+                    <div>Tipo documento: <span t-out="ref.document_type_id.name"/></div>
+                    <div>Folio: <span t-out="ref.folio"/> · Fecha: <span t-out="ref.date" t-options="{'widget': 'date'}"/></div>
+                    <div t-if="ref.code or ref.reason">Razón: <t t-if="ref.code"><span t-field="ref.code"/><t t-if="ref.reason">: </t></t><span t-out="ref.reason"/></div>
+                </div>
+            </div>
+            <!-- 7. Detalle -->
+            <table style="width: 100%; border-top: 1px solid #000;" class="mt-2">
+                <tr><td class="fw-bold">Artículo</td><td class="fw-bold text-end">Valor</td></tr>
+                <t t-foreach="o._tf_dte_cl_line_infos()" t-as="line">
+                    <tr><td colspan="2"><span t-out="line.product_name"/><t t-if="line.is_exempt"> (exento)</t></td></tr>
+                    <tr>
+                        <td style="padding-left: 3mm;">
+                            <span t-out="o._tf_dte_cl_format_qty(line.quantity)"/> x <span t-out="o._tf_dte_cl_format_amount(line.price_unit)"/>
+                            <t t-if="line.discount"><br/>Dscto. <span t-out="o._tf_dte_cl_format_qty(line.discount)"/>%: -<span t-out="o._tf_dte_cl_format_amount(o._tf_dte_cl_line_discount(line))"/></t>
+                        </td>
+                        <td class="text-end" t-out="o._tf_dte_cl_format_amount(line.subtotal)"/>
+                    </tr>
+                </t>
+            </table>
+            <!-- 8. Totales -->
+            <table style="width: 100%; border-top: 1px solid #000;" class="mt-1">
+                <tr t-foreach="o._tf_dte_cl_print_totals()" t-as="row" t-attf-class="{{ 'fw-bold' if row_last else '' }}">
+                    <td t-out="row[0]"/>
+                    <td class="text-end" t-out="o._tf_dte_cl_format_amount(row[1])"/>
+                </tr>
+            </table>
+            <!-- 9. Acuse de recibo (cedible) -->
+            <div t-if="cedible" class="mt-2"><t t-call="tf_dte_cl.dte_receipt"/></div>
+            <!-- 10. Timbre: a 2 cm o más del borde izquierdo del papel -->
+            <div class="mt-2">
+                <t t-call="tf_dte_cl.dte_stamp">
+                    <t t-set="stamp_style" t-value="'padding-left: 1.6cm;'"/>
+                    <t t-set="stamp_img_style" t-value="'max-width: 5.6cm; max-height: 4cm;'"/>
+                </t>
+            </div>
+            <!-- 11. Leyenda de destino (cedible) -->
+            <div t-if="cedible" class="text-end fw-bold mt-1" t-out="o._tf_dte_cl_cedible_legend()"/>
+        </div>
+    </template>
+
+    <template id="report_dte_thermal_document">
+        <t t-call="web.basic_layout">
+            <t t-set="company" t-value="o.company_id"/>
+            <div class="page">
+                <t t-foreach="o._tf_dte_cl_print_copies()" t-as="cedible">
+                    <div t-if="not cedible_first" style="page-break-before: always;"/>
+                    <t t-call="tf_dte_cl.dte_thermal_copy"/>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_move_dte_thermal">
+        <t t-call="web.html_container">
+            <t t-foreach="docs.filtered('tf_dte_cl_folio')" t-as="o">
+                <t t-call="tf_dte_cl.report_dte_thermal_document" t-lang="o.partner_id.lang"/>
+            </t>
+        </t>
+    </template>
+
     <template id="report_picking_dte_thermal">
         <t t-call="web.html_container">
             <t t-foreach="docs.filtered('tf_dte_cl_folio')" t-as="o">
-                <t t-set="company" t-value="o.company_id"/>
-                <div class="page"><t t-call="tf_dte_cl.dte_thermal_body"/></div>
+                <t t-call="tf_dte_cl.report_dte_thermal_document" t-lang="o.partner_id.lang"/>
             </t>
         </t>
+    </template>
+
+    <!-- ============================================================
+         Reporte estándar de facturas (Imprimir, Descargar, Enviar):
+         los documentos con folio usan el formato DTE.
+         ============================================================ -->
+    <template id="report_invoice_tf_dte_cl" inherit_id="account.report_invoice">
+        <xpath expr="//t[@t-call='account.report_invoice_document']" position="after">
+            <t t-elif="o._get_name_invoice_report() == 'tf_dte_cl.report_move_dte_document'"
+               t-call="tf_dte_cl.report_move_dte_document" t-lang="lang"/>
+        </xpath>
     </template>
 
 </odoo>
