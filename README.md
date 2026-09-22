@@ -143,6 +143,11 @@ el formato estándar de Odoo. Hay además una versión para papel continuo de 80
 - **Copia cedible** en facturas 33 y 34, y en guías que constituyen venta, con
   el acuse de recibo de la Ley 19.983. Se desactiva en Ajustes.
 
+El formato de papel continuo usa una altura fija de 297 mm, por lo que el PDF
+queda con espacio en blanco al final; la impresora térmica corta según el
+contenido. Se define así porque la altura automática no es confiable en todas
+las versiones de wkhtmltopdf.
+
 ## Límites conocidos (facturacion_electronica 0.24.0)
 
 - Referencias globales (`IndGlobal`) y RUT de otro contribuyente (`RUTOtr`):
@@ -166,16 +171,15 @@ el formato estándar de Odoo. Hay además una versión para papel continuo de 80
 Probado en producción:
 
 - Factura electrónica (33) y nota de crédito (61) aceptadas por el SII.
-- Representación impresa en hoja revisada contra el manual de muestras
-  impresas: la factura con su copia tributaria y cedible (acuse de recibo y
-  leyenda «CEDIBLE»), y la nota de crédito sin copia cedible, con su referencia
-  al documento anulado.
+- Representación impresa revisada contra el manual de muestras impresas, en
+  hoja y en papel continuo: la factura con su copia tributaria y cedible (acuse
+  de recibo y leyenda «CEDIBLE»), y la nota de crédito sin copia cedible, con su
+  referencia al documento anulado.
 
 Pendiente:
 
 - Probar factura exenta (34), nota de débito (56) y guía de despacho (52),
   incluida su impresión.
-- Revisar la impresión en papel continuo (80 mm) con documentos reales.
 - Intercambio de DTE con el receptor.
 - Suite de pruebas de Odoo (`tests/`).
 
