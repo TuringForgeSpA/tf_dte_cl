@@ -23,8 +23,11 @@ y sigue su estado hasta la respuesta final.
 
 **No incluye:** boletas electrónicas (39/41), punto de venta, facturas de compra
 (46), liquidación-factura (43), documentos de exportación, libros electrónicos
-ni cesión de facturas. El intercambio de documentos con el receptor está
-planificado para una etapa posterior.
+ni cesión de facturas.
+
+El **intercambio** con clientes y proveedores (envío del XML al cliente,
+recepción de facturas de proveedores, aceptación y reclamo en el SII) está en el
+módulo complementario `tf_dte_cl_intercambio`, que tiene su propio manual.
 
 ---
 
@@ -298,7 +301,5 @@ las pruebas.*
 ## 7. Pendiente de documentar
 
 - Puesta en producción: cambio de ambiente, resolución definitiva y CAF de producción.
-- Proceso de certificación ante el SII, paso a paso.
-- Tiempos reales de respuesta y glosas de rechazo más comunes.
-- Envío del DTE al correo del receptor (intercambio).
-- Representación impresa según el manual de muestras impresas.
+- Tiempos reales de respuesta del SII y glosas de rechazo más comunes.
+- Procedimiento de anulación de folios en el sitio del SII.
