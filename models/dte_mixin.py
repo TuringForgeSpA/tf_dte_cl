@@ -113,6 +113,10 @@ class TfDteClDocumentMixin(models.AbstractModel):
 
     tf_dte_cl_document_type = fields.Selection(DTE_TYPES, string='Tipo DTE', readonly=True, copy=False)
     tf_dte_cl_folio = fields.Integer(string='Folio SII', readonly=True, copy=False, index=True)
+    tf_dte_cl_title = fields.Char(
+        string='Documento SII', compute='_compute_tf_dte_cl_title',
+        help='Tipo de documento y folio SII, por ejemplo "Factura electrónica N° 45".',
+    )
     tf_dte_cl_caf_id = fields.Many2one('tf_dte_cl.caf', string='CAF', readonly=True, copy=False)
     tf_dte_cl_state = fields.Selection(
         DTE_STATES, string='Estado DTE', readonly=True, copy=False, index=True, tracking=True,
@@ -509,6 +513,16 @@ class TfDteClDocumentMixin(models.AbstractModel):
         return self.tf_dte_cl_state
 
     # ------------------------------------------------------------------
+    # Título visible en el formulario
+    # ------------------------------------------------------------------
+    @api.depends('tf_dte_cl_document_type', 'tf_dte_cl_folio')
+    def _compute_tf_dte_cl_title(self):
+        for record in self:
+            record.tf_dte_cl_title = record.tf_dte_cl_folio and '%s N° %s' % (
+                record._tf_dte_cl_document_name(), record.tf_dte_cl_folio,
+            ) or False
+
+    # ------------------------------------------------------------------
     # Impresión
     # ------------------------------------------------------------------
     def _tf_dte_cl_document_name(self) -> str:
@@ -639,6 +653,7 @@ class TfDteClDocumentMixin(models.AbstractModel):
         if self.tf_dte_cl_folio:
             self.env['tf_dte_cl.caf.void']._tf_dte_cl_register(
                 self.company_id, self.tf_dte_cl_document_type, self.tf_dte_cl_folio, reason, record=self,
+                caf=self.tf_dte_cl_caf_id,
             )
 
     def _tf_dte_cl_clear(self) -> None:

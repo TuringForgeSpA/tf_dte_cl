@@ -42,6 +42,16 @@ DTE_TYPES = [
 ]
 DTE_TYPE_CODES = frozenset(code for code, _label in DTE_TYPES)
 
+# IDK del CAF: identifica la llave con que el SII firmó el CAF y, con ello, el
+# ambiente en que es válido. Valores observados en CAF reales emitidos por el SII.
+IDK_ENVIRONMENTS = {'100': 'certificacion', '300': 'produccion'}
+CAF_ENVIRONMENTS = [('certificacion', 'Certificación'), ('produccion', 'Producción')]
+
+
+def environment_from_idk(idk) -> str | bool:
+    """Ambiente del CAF según su IDK, o False si el valor no es conocido."""
+    return IDK_ENVIRONMENTS.get(str(idk or '').strip(), False)
+
 _XML_DECLARATION_RE = re.compile(rb'^\s*<\?xml[^>]*\?>\s*')
 _DECLARED_ENCODING_RE = re.compile(rb'^\s*<\?xml[^>]*encoding=["\']([A-Za-z0-9._-]+)["\']')
 
@@ -157,6 +167,11 @@ class TfDteClCaf(models.Model):
         help='Fecha de autorización más la vigencia configurada en la compañía.',
     )
     idk = fields.Char(string='IDK', readonly=True)
+    environment = fields.Selection(
+        CAF_ENVIRONMENTS, string='Ambiente', compute='_compute_environment', store=True, index=True,
+        help='Ambiente del SII en que es válido el CAF, según su IDK. Los folios solo se toman de CAF '
+             'del ambiente configurado en la compañía.',
+    )
     folios_available = fields.Integer(string='Folios disponibles', compute='_compute_folios', store=True)
     exhausted = fields.Boolean(string='Agotado', compute='_compute_folios', store=True)
     state = fields.Selection(
@@ -183,6 +198,11 @@ class TfDteClCaf(models.Model):
         for caf in self:
             months = caf.company_id.tf_dte_cl_caf_validity_months or 0
             caf.date_expiry = caf.date_authorized and caf.date_authorized + relativedelta(months=months)
+
+    @api.depends('idk')
+    def _compute_environment(self):
+        for caf in self:
+            caf.environment = environment_from_idk(caf.idk)
 
     @api.depends('next_folio', 'folio_to')
     def _compute_folios(self):
@@ -238,7 +258,27 @@ class TfDteClCaf(models.Model):
             # El cliente web envía next_folio = 0 por defecto: se parte desde el primer folio.
             if not vals.get('next_folio') or vals['next_folio'] < vals['folio_from']:
                 vals['next_folio'] = vals['folio_from']
-        return super().create(vals_list)
+        cafs = super().create(vals_list)
+        for caf in cafs:
+            caf._tf_dte_cl_warn_environment()
+        return cafs
+
+    def _tf_dte_cl_warn_environment(self) -> None:
+        """Avisa si el CAF no corresponde al ambiente actual de la compañía (no lo impide)."""
+        self.ensure_one()
+        company_environment = self.company_id.tf_dte_cl_environment
+        if not self.environment:
+            self.message_post(body=self.env._(
+                'No se reconoce el ambiente de este CAF (IDK %s): se usará en cualquier ambiente.',
+                self.idk or '-',
+            ))
+        elif self.environment != company_environment:
+            self.message_post(body=self.env._(
+                'Este CAF es de %(caf_env)s y la compañía está en %(company_env)s: sus folios no se '
+                'usarán hasta que la compañía cambie de ambiente.',
+                caf_env=dict(CAF_ENVIRONMENTS)[self.environment],
+                company_env=dict(CAF_ENVIRONMENTS).get(company_environment, company_environment),
+            ))
 
     def write(self, vals):
         if 'caf_file' in vals:
@@ -263,13 +303,15 @@ class TfDteClCaf(models.Model):
                     caf=caf.name, start=caf.folio_from, end=caf.folio_to + 1,
                 ))
 
-    @api.constrains('company_id', 'document_type', 'folio_from', 'folio_to')
+    @api.constrains('company_id', 'document_type', 'folio_from', 'folio_to', 'environment')
     def _check_overlap(self):
         for caf in self:
+            # Los rangos de certificación y de producción son independientes: pueden coincidir.
             overlapping = self.with_context(active_test=False).search([
                 ('id', '!=', caf.id),
                 ('company_id', '=', caf.company_id.id),
                 ('document_type', '=', caf.document_type),
+                ('environment', '=', caf.environment),
                 ('folio_from', '<=', caf.folio_to),
                 ('folio_to', '>=', caf.folio_from),
             ], limit=1)
@@ -284,10 +326,18 @@ class TfDteClCaf(models.Model):
     @api.model
     def _tf_dte_cl_unavailability_reason(self, company, document_type: str) -> str | bool:
         """Motivo por el que no hay folios, o ``False`` si hay al menos uno disponible."""
-        cafs = self.with_context(active_test=True).search([
+        all_cafs = self.with_context(active_test=True).search([
             ('company_id', '=', company.id), ('document_type', '=', document_type),
         ])
+        environment = company.tf_dte_cl_environment
+        cafs = all_cafs.filtered(lambda c: c.environment in (environment, False))
         if not cafs:
+            if all_cafs:
+                return self.env._(
+                    'Solo hay CAF de otro ambiente para el tipo de documento %(type)s; la compañía '
+                    'está en %(env)s. Cargue un CAF de %(env)s.',
+                    type=document_type, env=dict(CAF_ENVIRONMENTS).get(environment, environment),
+                )
             return self.env._('No hay un CAF cargado para el tipo de documento %s.', document_type)
         today = fields.Date.context_today(self)
         usable = cafs.filtered(lambda c: not c.exhausted and c.date_expiry and c.date_expiry >= today)
@@ -308,21 +358,22 @@ class TfDteClCaf(models.Model):
         el rollback devuelve el folio al CAF.
         """
         today = fields.Date.context_today(self)
-        self.flush_model(['next_folio', 'exhausted', 'date_expiry', 'active'])
+        self.flush_model(['next_folio', 'exhausted', 'date_expiry', 'active', 'environment'])
         self.env.cr.execute(
             """
             SELECT id
               FROM tf_dte_cl_caf
              WHERE company_id = %s
                AND document_type = %s
+               AND (environment = %s OR environment IS NULL)
                AND active
                AND NOT exhausted
                AND date_expiry >= %s
-             ORDER BY folio_from
+             ORDER BY environment IS NULL, folio_from
              LIMIT 1
                FOR UPDATE
             """,
-            [company.id, document_type, today],
+            [company.id, document_type, company.tf_dte_cl_environment, today],
         )
         row = self.env.cr.fetchone()
         if not row:
@@ -338,12 +389,14 @@ class TfDteClCaf(models.Model):
 
     @api.model
     def _tf_dte_cl_find_for_folio(self, company, document_type: str, folio: int):
+        # Los rangos de ambos ambientes pueden coincidir: se busca en el ambiente actual.
         caf = self.with_context(active_test=False).search([
             ('company_id', '=', company.id),
             ('document_type', '=', document_type),
+            ('environment', 'in', [company.tf_dte_cl_environment, False]),
             ('folio_from', '<=', folio),
             ('folio_to', '>=', folio),
-        ], limit=1)
+        ], order='environment', limit=1)
         if not caf:
             raise UserError(self.env._(
                 'No hay un CAF cargado que contenga el folio %(folio)s del tipo %(type)s.',
@@ -392,9 +445,13 @@ class TfDteClCafVoid(models.Model):
         self.write({'state': 'done', 'date_done': fields.Date.context_today(self)})
 
     @api.model
-    def _tf_dte_cl_register(self, company, document_type: str, folio: int, reason: str, record=None):
-        """Registra un folio firmado que no llegará al SII (idempotente)."""
-        caf = self.env['tf_dte_cl.caf']._tf_dte_cl_find_for_folio(company, document_type, folio)
+    def _tf_dte_cl_register(self, company, document_type: str, folio: int, reason: str, record=None, caf=None):
+        """Registra un folio firmado que no llegará al SII (idempotente).
+
+        Si se conoce el CAF con que se firmó, se usa ese: los rangos de
+        certificación y producción pueden coincidir.
+        """
+        caf = caf or self.env['tf_dte_cl.caf']._tf_dte_cl_find_for_folio(company, document_type, folio)
         existing = self.sudo().search([('caf_id', '=', caf.id), ('folio', '=', folio)], limit=1)
         if existing:
             return existing

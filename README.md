@@ -4,7 +4,7 @@ Módulo técnico para Odoo 18 que emite documentos tributarios electrónicos (DT
 ante el Servicio de Impuestos Internos (SII) de Chile usando la librería
 [`facturacion_electronica`](https://gitlab.com/dansanti/facturacion_electronica) 0.24.0.
 
-Versión 18.0.2.3.0. Es independiente de la localización oficial de Odoo
+Versión 18.0.2.6.0. Es independiente de la localización oficial de Odoo
 (`l10n_cl`, `l10n_latam_base`, `l10n_latam_invoice_document`).
 
 ## Alcance
@@ -86,7 +86,10 @@ Se cargan al instalar o actualizar, solo con los registros que falten:
    administradores del sistema. Si un `.p12` antiguo (RC2-40-CBC) no abre, el
    servidor necesita el proveedor *legacy* de OpenSSL 3.
 3. **CAF**: Contabilidad > Configuración > Facturación electrónica Chile > CAF.
-   Se validan tipo, RUT, rango, solapamiento, llaves y codificación.
+   Se validan tipo, RUT, rango, solapamiento, llaves y codificación. El
+   **ambiente** del CAF se deduce de su `IDK` (100 certificación, 300
+   producción): los folios solo se toman de CAF del ambiente configurado en la
+   compañía, y los rangos de ambos ambientes pueden coincidir.
 4. **Impuestos de venta**: con `tf_l10n_cl` ya vienen con su código SII. Si se
    crean a mano, asignar el código (14, 17, 18, 24, 25, 26, 27, 271): la tasa
    debe ser la oficial y el impuesto no puede estar incluido en el precio.
@@ -188,3 +191,5 @@ Pendiente:
 LGPL-3. La librería `facturacion_electronica` se distribuye bajo GPLv3 o
 posterior y no se incluye en este módulo; quien distribuya ambos en conjunto
 debe cumplir los términos de la GPL.
+
+© 2026 Turing Forge SpA. Distribuido bajo LGPL-3; vea los archivos `LICENSE` (LGPL-3) y `LICENSE.GPL` (GPL-3).

@@ -35,6 +35,23 @@
                         confirm="El folio actual quedará registrado para anulación y la guía se emitirá con un folio nuevo. ¿Continuar?"/>
             </xpath>
 
+            <!-- Guía de despacho bajo el título; la referencia de Odoo no cambia. -->
+            <xpath expr="//div[hasclass('oe_title')]/h1" position="after">
+                <div class="fs-5 mb-2" invisible="not tf_dte_cl_is_dte">
+                    <span invisible="not tf_dte_cl_folio">
+                        <field name="tf_dte_cl_title" readonly="1" class="oe_inline fw-bold"/>
+                        <field name="tf_dte_cl_state" widget="badge" readonly="1" class="ms-2"
+                               decoration-success="tf_dte_cl_state in ('accepted', 'accepted_objections')"
+                               decoration-info="tf_dte_cl_state in ('signed', 'sent')"
+                               decoration-warning="tf_dte_cl_state == 'send_unknown'"
+                               decoration-danger="tf_dte_cl_state in ('rejected', 'error')"/>
+                    </span>
+                    <span class="text-muted" invisible="tf_dte_cl_folio or state in ('done', 'cancel')">
+                        El folio SII de la guía se asignará al validar la entrega.
+                    </span>
+                </div>
+            </xpath>
+
             <xpath expr="/form/sheet" position="before">
                 <div class="alert alert-warning mb-0" role="alert"
                      invisible="not tf_dte_cl_error or tf_dte_cl_state in ('accepted', 'accepted_objections')">

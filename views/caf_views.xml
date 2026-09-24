@@ -24,6 +24,7 @@
                             <field name="document_type" invisible="not id"/>
                             <field name="rut" invisible="not id"/>
                             <field name="idk" invisible="not id"/>
+                            <field name="environment" invisible="not id"/>
                         </group>
                         <group invisible="not id">
                             <field name="folio_from"/>
@@ -64,6 +65,7 @@
                   decoration-danger="state == 'expired'"
                   decoration-warning="state == 'available' and folios_available &lt;= 10">
                 <field name="document_type"/>
+                <field name="environment" widget="badge" decoration-success="environment == 'produccion'" decoration-info="environment == 'certificacion'"/>
                 <field name="folio_from"/>
                 <field name="folio_to"/>
                 <field name="next_folio"/>

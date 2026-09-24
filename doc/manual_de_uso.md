@@ -109,6 +109,13 @@ en **Contabilidad > Configuración > Facturación electrónica Chile > CAF**:
    archivo corresponda a la compañía, que el rango no se solape con otro CAF y
    que las llaves sean coherentes.
 
+El módulo reconoce si el CAF es de **certificación o de producción** y lo
+muestra en la columna *Ambiente*. Al emitir, solo usa folios de CAF del ambiente
+configurado en Ajustes: si cargas un CAF del otro ambiente, queda registrado con
+un aviso, pero sus folios no se usan hasta que la compañía cambie de ambiente.
+Por eso pueden convivir un CAF de certificación y uno de producción con los
+mismos números de folio.
+
 En la lista verás los folios disponibles y la fecha hasta la que se puede usar.
 Cuando queden 10 folios o menos, la fila se muestra en naranja: es momento de
 pedir un CAF nuevo.
