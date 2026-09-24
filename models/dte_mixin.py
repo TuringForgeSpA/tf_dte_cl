@@ -396,7 +396,11 @@ class TfDteClDocumentMixin(models.AbstractModel):
     # Etapa 2: envío (red)
     # ------------------------------------------------------------------
     def _tf_dte_cl_resend_minutes(self) -> int:
-        value = self.env['ir.config_parameter'].sudo().get_param('tf_dte_cl.unknown_resend_minutes')
+        # Si el parámetro nunca se guardó en Ajustes, get_param devuelve el valor por
+        # defecto (sin él devolvería False, e int(False) es 0: se reenviaría de inmediato).
+        value = self.env['ir.config_parameter'].sudo().get_param(
+            'tf_dte_cl.unknown_resend_minutes', DEFAULT_RESEND_MINUTES,
+        )
         try:
             return max(int(value), 0)
         except (TypeError, ValueError):

@@ -4,7 +4,7 @@ Módulo técnico para Odoo 18 que emite documentos tributarios electrónicos (DT
 ante el Servicio de Impuestos Internos (SII) de Chile usando la librería
 [`facturacion_electronica`](https://gitlab.com/dansanti/facturacion_electronica) 0.24.0.
 
-Versión 18.0.2.6.0. Es independiente de la localización oficial de Odoo
+Versión 18.0.2.6.2. Es independiente de la localización oficial de Odoo
 (`l10n_cl`, `l10n_latam_base`, `l10n_latam_invoice_document`).
 
 ## Alcance
@@ -150,6 +150,29 @@ El formato de papel continuo usa una altura fija de 297 mm, por lo que el PDF
 queda con espacio en blanco al final; la impresora térmica corta según el
 contenido. Se define así porque la altura automática no es confiable en todas
 las versiones de wkhtmltopdf.
+
+## Pruebas automatizadas
+
+La carpeta `tests/` contiene pruebas de Odoo que no llaman al SII: sus
+respuestas se simulan, y el certificado y los CAF de prueba se generan en cada
+ejecución. Deben correrse en una **base exclusiva para pruebas**, nunca en la de
+producción:
+
+```bash
+dropdb --if-exists odoo_tests
+./odoo-bin -c /etc/odoo.conf -d odoo_tests --without-demo=all \
+    -i tf_dte_cl --test-enable --test-tags /tf_dte_cl --stop-after-init
+```
+
+El resultado aparece al final del log, con el detalle de cada prueba fallida.
+
+| Archivo | Qué cubre |
+|---|---|
+| `test_pure.py` | RUT, reglas de líneas e impuestos, totales, referencias, parseo del CAF y decisiones del ciclo de envío |
+| `test_sii_client.py` | Interpretación de las respuestas de la librería y aislamiento de sus efectos globales |
+| `test_caf.py` | Carga, solapamiento, ambiente y toma de folios del CAF |
+| `test_invoice.py` | Ciclo de facturas y notas: firma, envío, consulta, montos que no cuadran, envío sin confirmar, rechazo, nota de crédito e impresión |
+| `test_picking.py` | Guía de despacho: valorización, validación, destino obligatorio e impresión con y sin copia cedible |
 
 ## Límites conocidos (facturacion_electronica 0.24.0)
 

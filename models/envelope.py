@@ -109,18 +109,29 @@ class TfDteClEnvelope(models.Model):
         return max(count - self.confirmed_attempts, 0)
 
     def _tf_dte_cl_register_attempt(self) -> None:
-        """Registra el intento en una transacción propia, que sobrevive a un rollback."""
+        """Registra el intento en una transacción propia, que sobrevive a un rollback.
+
+        Si el sobre todavía no está confirmado en la base (se creó en esta misma
+        transacción, por ejemplo al volver a firmar tras un envío fallido), otra
+        conexión no lo ve y la llave foránea fallaría. En ese caso el intento se
+        registra en la transacción actual: si esta se deshace, el sobre también
+        desaparece y no hay intento que preservar.
+        """
         self.ensure_one()
+        self.flush_recordset()
+        query = """
+            INSERT INTO tf_dte_cl_envelope_attempt
+                   (envelope_id, date, create_uid, create_date, write_uid, write_date)
+            VALUES (%s, now() at time zone 'UTC', %s, now() at time zone 'UTC',
+                    %s, now() at time zone 'UTC')
+        """
+        params = [self.id, self.env.uid, self.env.uid]
         with self.env.registry.cursor() as cr:
-            cr.execute(
-                """
-                INSERT INTO tf_dte_cl_envelope_attempt
-                       (envelope_id, date, create_uid, create_date, write_uid, write_date)
-                VALUES (%s, now() at time zone 'UTC', %s, now() at time zone 'UTC',
-                        %s, now() at time zone 'UTC')
-                """,
-                [self.id, self.env.uid, self.env.uid],
-            )
+            cr.execute('SELECT 1 FROM tf_dte_cl_envelope WHERE id = %s', [self.id])
+            if cr.fetchone():
+                cr.execute(query, params)
+                return
+        self.env.cr.execute(query, params)
 
     def _tf_dte_cl_confirm_attempts(self) -> None:
         """Da por resueltos todos los intentos registrados hasta ahora."""
