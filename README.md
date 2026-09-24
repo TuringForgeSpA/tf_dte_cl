@@ -197,17 +197,21 @@ El resultado aparece al final del log, con el detalle de cada prueba fallida.
 Probado en producción:
 
 - Factura electrónica (33) y nota de crédito (61) aceptadas por el SII.
+- Guía de despacho (52) de traslado interno, emitida e impresa.
 - Representación impresa revisada contra el manual de muestras impresas, en
   hoja y en papel continuo: la factura con su copia tributaria y cedible (acuse
-  de recibo y leyenda «CEDIBLE»), y la nota de crédito sin copia cedible, con su
-  referencia al documento anulado.
+  de recibo y leyenda «CEDIBLE»), la nota de crédito sin copia cedible, con su
+  referencia al documento anulado, y la guía de traslado interno sin copia
+  cedible.
+- Suite de pruebas automatizadas (`tests/`): 55 pruebas.
+- Intercambio de DTE con clientes y proveedores: implementado en el módulo
+  complementario `tf_dte_cl_intercambio`.
 
 Pendiente:
 
-- Probar factura exenta (34), nota de débito (56) y guía de despacho (52),
-  incluida su impresión.
-- Intercambio de DTE con el receptor.
-- Suite de pruebas de Odoo (`tests/`).
+- Probar factura exenta (34) y nota de débito (56), incluida su impresión.
+- Probar una guía de despacho de venta (traslado 1), con su copia «CEDIBLE CON
+  SU FACTURA».
 
 ## Licencia
 
