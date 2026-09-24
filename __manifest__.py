@@ -2,7 +2,7 @@
 {
     'name': 'Facturación electrónica SII Chile - Núcleo B2B',
     'summary': 'Emisión de DTE B2B (facturas 33/34, notas 56/61 y guías 52) ante el SII.',
-    'version': '18.0.2.4.0',
+    'version': '18.0.2.4.1',
     'description': 'Emisión de DTE B2B ante el SII de Chile. Ver README.md para la documentación completa.',
     'category': 'Accounting/Localizations/EDI',
     'license': 'LGPL-3',

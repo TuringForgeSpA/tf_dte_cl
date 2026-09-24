@@ -46,7 +46,8 @@
     <template id="dte_receiver">
         <t t-set="receiver" t-value="o._tf_dte_cl_get_receiver()"/>
         <t t-set="commercial" t-value="receiver.commercial_partner_id"/>
-        <table class="table table-sm table-borderless border border-dark mb-3 small">
+        <table class="table table-sm table-borderless border border-dark mb-3 small"
+               style="width: 100%; table-layout: fixed;">
             <tr>
                 <td class="fw-bold" style="width: 16%;">Señor(es):</td>
                 <td style="width: 44%;" t-out="commercial.name"/>
@@ -208,21 +209,24 @@
             <td class="fw-bold">Tipo de traslado:</td>
             <td><span t-field="o.tf_dte_cl_transfer_type"/></td>
         </t>
-        <table class="table table-sm table-borderless border border-dark mb-3 small">
+        <!-- Ancho fijo y "—" en los datos vacíos: wkhtmltopdf colapsa las celdas
+             vacías y descuadra el borde de la tabla. -->
+        <table class="table table-sm table-borderless border border-dark mb-3 small"
+               style="width: 100%; table-layout: fixed;">
             <tr>
                 <td class="fw-bold" style="width: 16%;">Despacho:</td>
                 <td style="width: 44%;"><span t-field="o.tf_dte_cl_dispatch_type"/></td>
                 <td class="fw-bold" style="width: 18%;">Patente:</td>
-                <td t-out="o.tf_dte_cl_vehicle_plate"/>
+                <td style="width: 22%;"><t t-out="o.tf_dte_cl_vehicle_plate or '—'"/></td>
             </tr>
             <tr>
                 <td class="fw-bold">Destino:</td>
                 <td>
-                    <span t-out="o.tf_dte_cl_dest_street"/><t t-if="o.tf_dte_cl_dest_comuna_id">, <span t-out="o.tf_dte_cl_dest_comuna_id.name"/></t><t t-if="o.tf_dte_cl_dest_city">, <span t-out="o.tf_dte_cl_dest_city"/></t>
+                    <span t-out="o.tf_dte_cl_dest_street or '—'"/><t t-if="o.tf_dte_cl_dest_comuna_id">, <span t-out="o.tf_dte_cl_dest_comuna_id.name"/></t><t t-if="o.tf_dte_cl_dest_city">, <span t-out="o.tf_dte_cl_dest_city"/></t>
                 </td>
                 <td class="fw-bold">Transportista:</td>
                 <td>
-                    <span t-out="o.tf_dte_cl_carrier_id.name"/>
+                    <t t-out="o.tf_dte_cl_carrier_id.name or '—'"/>
                     <t t-if="o.tf_dte_cl_driver_name"> · Chofer: <span t-out="o.tf_dte_cl_driver_name"/></t>
                 </td>
             </tr>
