@@ -40,6 +40,13 @@ confirmar y se muestra en el campo **Folio SII**.
 `tf_l10n_cl` reemplaza a `l10n_cl` en lo contable, a partir de la misma
 plantilla oficial de Odoo 18, sin sus dependencias.
 
+## Documentación
+
+- [`doc/manual_de_uso.md`](doc/manual_de_uso.md): uso diario y configuración.
+- [`doc/guia_de_despliegue.md`](doc/guia_de_despliegue.md): instalación,
+  actualización de producción, respaldos, pruebas, procesos automáticos y
+  problemas frecuentes.
+
 ## Instalación
 
 ```bash
