@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Formato de papel compacto para imprimir DTE con el reporte estándar de facturas.
+"""Formato de papel compacto para imprimir DTE con los reportes estándar de facturas y entregas.
 
 Ruta real: models/ir_actions_report.py
 
@@ -10,7 +10,11 @@ imprimir son DTE, se usa el formato compacto del módulo.
 """
 from odoo import models
 
-INVOICE_REPORTS = ('account.report_invoice', 'account.report_invoice_with_payments')
+# Reportes estándar que, con documentos DTE, muestran el formato del SII.
+STANDARD_DTE_REPORTS = {
+    'account.move': ('account.report_invoice', 'account.report_invoice_with_payments'),
+    'stock.picking': ('stock.report_deliveryslip',),
+}
 DTE_PAPERFORMAT_XMLID = 'tf_dte_cl.paperformat_tf_dte_cl_a4'
 
 
@@ -19,15 +23,15 @@ class IrActionsReport(models.Model):
 
     def _render_qweb_pdf(self, report_ref, res_ids=None, data=None):
         report = self._get_report(report_ref)
-        if report.model == 'account.move' and report.report_name in INVOICE_REPORTS and res_ids:
+        if report.report_name in STANDARD_DTE_REPORTS.get(report.model, ()) and res_ids:
             ids = [res_ids] if isinstance(res_ids, int) else list(res_ids)
-            moves = self.env['account.move'].browse(ids).exists()
-            if moves and all(moves.mapped('tf_dte_cl_folio')):
+            records = self.env[report.model].browse(ids).exists()
+            if records and all(records.mapped('tf_dte_cl_folio')):
                 self = self.with_context(tf_dte_cl_dte_paperformat=True)
         return super()._render_qweb_pdf(report_ref, res_ids=res_ids, data=data)
 
     def get_paperformat(self):
-        if self.env.context.get('tf_dte_cl_dte_paperformat') and self.model == 'account.move':
+        if self.env.context.get('tf_dte_cl_dte_paperformat') and self.model in STANDARD_DTE_REPORTS:
             paperformat = self.env.ref(DTE_PAPERFORMAT_XMLID, raise_if_not_found=False)
             if paperformat:
                 return paperformat

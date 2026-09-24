@@ -206,12 +206,12 @@
         <t t-call="tf_dte_cl.dte_header"/>
         <t t-call="tf_dte_cl.dte_receiver">
             <td class="fw-bold">Tipo de traslado:</td>
-            <td t-field="o.tf_dte_cl_transfer_type"/>
+            <td><span t-field="o.tf_dte_cl_transfer_type"/></td>
         </t>
         <table class="table table-sm table-borderless border border-dark mb-3 small">
             <tr>
                 <td class="fw-bold" style="width: 16%;">Despacho:</td>
-                <td style="width: 44%;" t-field="o.tf_dte_cl_dispatch_type"/>
+                <td style="width: 44%;"><span t-field="o.tf_dte_cl_dispatch_type"/></td>
                 <td class="fw-bold" style="width: 18%;">Patente:</td>
                 <td t-out="o.tf_dte_cl_vehicle_plate"/>
             </tr>
@@ -392,6 +392,24 @@
         <xpath expr="//t[@t-call='account.report_invoice_document']" position="after">
             <t t-elif="o._get_name_invoice_report() == 'tf_dte_cl.report_move_dte_document'"
                t-call="tf_dte_cl.report_move_dte_document" t-lang="lang"/>
+        </xpath>
+    </template>
+
+    <!-- ============================================================
+         Albarán de entrega estándar (botón Imprimir de la entrega):
+         las entregas con folio usan el formato de guía de despacho.
+         ============================================================ -->
+    <template id="report_deliveryslip_tf_dte_cl" inherit_id="stock.report_deliveryslip">
+        <!-- stock.report_deliveryslip no incluye web.html_container (lo pone
+             report_delivery_document), así que se agrega aquí: arma la
+             cabecera HTML con los estilos y la codificación. -->
+        <xpath expr="//t[@t-call='stock.report_delivery_document']" position="before">
+            <t t-if="o.tf_dte_cl_folio" t-call="web.html_container">
+                <t t-call="tf_dte_cl.report_picking_dte_document" t-lang="o.partner_id.lang"/>
+            </t>
+        </xpath>
+        <xpath expr="//t[@t-call='stock.report_delivery_document']" position="attributes">
+            <attribute name="t-if">not o.tf_dte_cl_folio</attribute>
         </xpath>
     </template>
 
