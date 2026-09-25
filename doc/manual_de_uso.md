@@ -179,6 +179,21 @@ sin dejar huecos en la numeración del SII.
 
 La pestaña **DTE** muestra folio, estado, Track ID y el XML firmado.
 
+### 4.1.1 Descuentos y recargos globales
+
+Para aplicar un descuento a toda la factura, agrega una línea con el producto
+**Descuento global** y un **precio negativo** (por ejemplo, −2.201). Para un
+recargo global (flete, embalaje), usa un producto marcado como *Descuento o
+recargo global DTE* con precio positivo. Se pueden crear productos propios con
+esa marca, en la ficha del producto.
+
+- Con **IVA**, la línea descuenta o recarga el monto afecto; **sin impuestos**,
+  el monto exento.
+- El SII lo recibe como descuento o recargo global, no como una línea del
+  detalle, y en el PDF aparece en los totales.
+- No se admite en facturas con impuestos adicionales (ILA y similares): ahí
+  aplica el descuento en cada línea.
+
 ### 4.2 Estados del DTE
 
 | Estado | Qué significa | Qué hacer |

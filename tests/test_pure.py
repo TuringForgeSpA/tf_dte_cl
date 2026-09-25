@@ -86,6 +86,37 @@ class TestLines(TransactionCase):
 
 
 @tagged('post_install', '-at_install', 'tf_dte_cl')
+class TestGlobalAdjustments(TransactionCase):
+
+    def test_totals_with_discount(self):
+        discount = dl.GlobalAdjustment('Descuento', -2201, [IVA])
+        totals = dl.compute_totals([line(qty=1, price=8803, subtotal=8803)], [discount])
+        self.assertEqual((totals['net'], totals['taxes']['14'][1], totals['total']), (6602, 1254, 7856))
+
+    def test_library_block(self):
+        block = dl.build_global_adjustments([
+            dl.GlobalAdjustment('Descuento', -2201, [IVA]),
+            dl.GlobalAdjustment('Flete', 500, [IVA]),
+            dl.GlobalAdjustment('Descuento exento', -100, []),
+            dl.GlobalAdjustment('Cero', 0, [IVA]),
+        ])
+        self.assertEqual([(b['TpoMov'], b['ValorDR'], b.get('IndExeDR')) for b in block],
+                         [('D', 2201, None), ('R', 500, None), ('D', 100, 1)])
+        self.assertEqual([b['NroLinDR'] for b in block], [1, 2, 3])
+
+    def test_rules(self):
+        lines = [line(qty=1, price=8803, subtotal=8803)]
+        discount = dl.GlobalAdjustment('Descuento', -2201, [IVA])
+        self.assertFalse(dl.adjustment_errors('33', [discount], lines))
+        errors = lambda *args: ' '.join(dl.adjustment_errors(*args))
+        self.assertIn('impuestos adicionales',
+                      errors('33', [discount], [line(qty=1, price=8803, subtotal=8803, taxes=(IVA, WINE))]))
+        self.assertIn('no pueden superar', errors('33', [dl.GlobalAdjustment('x', -9000, [IVA])], lines))
+        self.assertIn('requiere líneas exentas', errors('33', [dl.GlobalAdjustment('x', -100, [])], lines))
+        self.assertIn('solo puede llevar IVA', errors('33', [dl.GlobalAdjustment('x', -100, [WINE])], lines))
+
+
+@tagged('post_install', '-at_install', 'tf_dte_cl')
 class TestReferences(TransactionCase):
 
     def ref(self, **values):

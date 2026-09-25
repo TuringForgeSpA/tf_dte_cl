@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: views/product_template_views.xml -->
+<odoo>
+    <record id="product_template_form_view_tf_dte_cl" model="ir.ui.view">
+        <field name="name">product.template.form.tf_dte_cl</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='categ_id']" position="after">
+                <field name="tf_dte_cl_global_adjustment"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -4,7 +4,7 @@ Módulo técnico para Odoo 18 que emite documentos tributarios electrónicos (DT
 ante el Servicio de Impuestos Internos (SII) de Chile usando la librería
 [`facturacion_electronica`](https://gitlab.com/dansanti/facturacion_electronica) 0.24.0.
 
-Versión 18.0.2.6.2. Es independiente de la localización oficial de Odoo
+Versión 18.0.2.7.0. Es independiente de la localización oficial de Odoo
 (`l10n_cl`, `l10n_latam_base`, `l10n_latam_invoice_document`).
 
 ## Alcance
@@ -139,6 +139,14 @@ Se cargan al instalar o actualizar, solo con los registros que falten:
 En Odoo 18 el cron de `account_edi` viene inactivo; por eso el módulo tiene su
 propio cron de envío y mantiene sincronizado el documento EDI.
 
+## Descuentos y recargos globales
+
+Una línea de factura con un producto marcado como **Descuento o recargo global
+DTE** (viene creado el producto «Descuento global») no va al detalle del DTE: se
+informa como descuento global si su precio es negativo, o como recargo si es
+positivo. Con IVA descuenta o recarga el monto afecto, y sin impuestos, el
+exento. En el PDF aparece como una línea de los totales.
+
 ## Impresión
 
 El formato sigue el *Manual de muestras impresas* del SII (versión 4.0). Los
@@ -188,8 +196,10 @@ El resultado aparece al final del log, con el detalle de cada prueba fallida.
 - Una corrección de texto (`CodRef` 2) exige la razón en formato
   `DICE: ... DEBE DECIR: ...`.
 - Un solo impuesto adicional por línea.
-- Descuentos y recargos globales (`DscRcgGlobal`) no implementados: use el
-  descuento por línea.
+- Descuentos y recargos globales en pesos: la librería los resta también del
+  IVA y de los impuestos adicionales. El módulo informa neto, IVA y total
+  explícitos para corregir el IVA, y no los admite en documentos con impuestos
+  adicionales (ILA y similares), donde no hay corrección posible.
 
 ## Criterios propios (no definidos por el SII)
 

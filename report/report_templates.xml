@@ -239,15 +239,18 @@
     <!-- Documento completo: copia tributaria y, si corresponde, cedible en la página siguiente.
          Un solo artículo por registro, para que Odoo asocie correctamente el PDF al documento. -->
     <template id="report_move_dte_document">
-        <t t-call="web.basic_layout">
-            <t t-set="company" t-value="o.company_id"/>
+        <!-- Se arma el artículo aquí y no con web.basic_layout, que trae su propio
+             web.html_container: quien llama a este documento aporta el contenedor. -->
+        <t t-set="company" t-value="o.company_id"/>
+        <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id"
+             t-att-data-oe-lang="o.env.context.get('lang')">
             <div class="page">
                 <t t-foreach="o._tf_dte_cl_print_copies()" t-as="cedible">
                     <div t-if="not cedible_first" style="page-break-before: always;"/>
                     <t t-call="tf_dte_cl.dte_move_copy"/>
                 </t>
             </div>
-        </t>
+        </div>
     </template>
 
     <template id="report_move_dte">
@@ -259,15 +262,18 @@
     </template>
 
     <template id="report_picking_dte_document">
-        <t t-call="web.basic_layout">
-            <t t-set="company" t-value="o.company_id"/>
+        <!-- Se arma el artículo aquí y no con web.basic_layout, que trae su propio
+             web.html_container: quien llama a este documento aporta el contenedor. -->
+        <t t-set="company" t-value="o.company_id"/>
+        <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id"
+             t-att-data-oe-lang="o.env.context.get('lang')">
             <div class="page">
                 <t t-foreach="o._tf_dte_cl_print_copies()" t-as="cedible">
                     <div t-if="not cedible_first" style="page-break-before: always;"/>
                     <t t-call="tf_dte_cl.dte_picking_copy"/>
                 </t>
             </div>
-        </t>
+        </div>
     </template>
 
     <template id="report_picking_dte">
@@ -314,7 +320,15 @@
             </div>
             <!-- 5. Fecha de emisión -->
             <div class="mt-2 fw-bold">Fecha de emisión: <span t-out="o.tf_dte_cl_emission_date" t-options="{'widget': 'date'}"/></div>
-            <div t-if="o._name == 'stock.picking'">Tipo de traslado: <span t-field="o.tf_dte_cl_transfer_type"/></div>
+            <!-- Guía: datos de traslado, despacho y destino (como en el formato A4) -->
+            <t t-if="o._name == 'stock.picking'">
+                <div>Tipo de traslado: <span t-field="o.tf_dte_cl_transfer_type"/></div>
+                <div>Despacho: <span t-field="o.tf_dte_cl_dispatch_type"/></div>
+                <div>Destino: <span t-out="o.tf_dte_cl_dest_street or '—'"/><t t-if="o.tf_dte_cl_dest_comuna_id">, <span t-out="o.tf_dte_cl_dest_comuna_id.name"/></t><t t-if="o.tf_dte_cl_dest_city">, <span t-out="o.tf_dte_cl_dest_city"/></t></div>
+                <div t-if="o.tf_dte_cl_carrier_id">Transportista: <span t-out="o.tf_dte_cl_carrier_id.name"/></div>
+                <div t-if="o.tf_dte_cl_vehicle_plate">Patente: <span t-out="o.tf_dte_cl_vehicle_plate"/></div>
+                <div t-if="o.tf_dte_cl_driver_name">Chofer: <span t-out="o.tf_dte_cl_driver_name"/></div>
+            </t>
             <!-- 6. Referencias -->
             <t t-set="references" t-value="o._tf_dte_cl_get_references()"/>
             <div t-if="references" class="mt-2">
@@ -361,15 +375,18 @@
     </template>
 
     <template id="report_dte_thermal_document">
-        <t t-call="web.basic_layout">
-            <t t-set="company" t-value="o.company_id"/>
+        <!-- Se arma el artículo aquí y no con web.basic_layout, que trae su propio
+             web.html_container: quien llama a este documento aporta el contenedor. -->
+        <t t-set="company" t-value="o.company_id"/>
+        <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id"
+             t-att-data-oe-lang="o.env.context.get('lang')">
             <div class="page">
                 <t t-foreach="o._tf_dte_cl_print_copies()" t-as="cedible">
                     <div t-if="not cedible_first" style="page-break-before: always;"/>
                     <t t-call="tf_dte_cl.dte_thermal_copy"/>
                 </t>
             </div>
-        </t>
+        </div>
     </template>
 
     <template id="report_move_dte_thermal">

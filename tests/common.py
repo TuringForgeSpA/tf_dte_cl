@@ -118,10 +118,21 @@ def sii_amounts(document: dict) -> dict:
         for code, tax_rate in taxes:
             if code != 14:
                 additional[(code, tax_rate)] += amount
+    for adjustment in document.get('DscRcgGlobal') or []:
+        value = adjustment['ValorDR'] * (-1 if adjustment['TpoMov'] == 'D' else 1)
+        if adjustment.get('IndExeDR'):
+            exempt += value
+        else:
+            net += value
     iva = round_half_up(Decimal(net) * Decimal(str(rate)) / 100)
     extra = sum(round_half_up(Decimal(base) * Decimal(str(r)) / 100) for (_c, r), base in additional.items())
-    return {'MntNeto': net, 'MntExe': exempt, 'MntIVA': iva, 'ImptoReten': extra,
-            'MntTotal': net + exempt + iva + extra}
+    amounts = {'MntNeto': net, 'MntExe': exempt, 'MntIVA': iva, 'ImptoReten': extra,
+               'MntTotal': net + exempt + iva + extra}
+    # Como la librería: si el documento trae totales explícitos, se usan tal cual.
+    for key in ('MntNeto', 'MntIVA', 'MntTotal'):
+        if key in document:
+            amounts[key] = document[key]
+    return amounts
 
 
 class FakeSii:

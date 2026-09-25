@@ -176,6 +176,10 @@ class TfDteClDocumentMixin(models.AbstractModel):
         """Líneas de detalle (``dte_lines.LineInfo``)."""
         raise NotImplementedError
 
+    def _tf_dte_cl_global_adjustments(self) -> list:
+        """Descuentos y recargos globales (``dte_lines.GlobalAdjustment``). Por defecto, ninguno."""
+        return []
+
     def _tf_dte_cl_expected_amounts(self) -> dict:
         """Montos de Odoo a comparar con los calculados por la librería (``{'MntTotal': 119}``)."""
         raise NotImplementedError
@@ -297,6 +301,13 @@ class TfDteClDocumentMixin(models.AbstractModel):
             document['TasaIVA'] = values['TasaIVA']
         document['Encabezado'] = header
         document['Detalle'] = values.get('Detalle') or []
+        if values.get('DscRcgGlobal'):
+            document['DscRcgGlobal'] = values['DscRcgGlobal']
+        # Totales explícitos: la librería resta un descuento global en pesos también del
+        # IVA; con estos valores usa los de Odoo en vez de recalcularlos.
+        for key in ('MntNeto', 'MntIVA', 'MntTotal'):
+            if key in values:
+                document[key] = values[key]
         references = self._tf_dte_cl_get_references()._tf_dte_cl_payload(doc_type)
         if references:
             document['Referencia'] = references
@@ -556,8 +567,9 @@ class TfDteClDocumentMixin(models.AbstractModel):
 
     def _tf_dte_cl_print_totals(self) -> list[tuple[str, int]]:
         self.ensure_one()
-        totals = compute_totals(self._tf_dte_cl_line_infos())
-        rows = []
+        adjustments = [adj for adj in self._tf_dte_cl_global_adjustments() if adj.amount]
+        totals = compute_totals(self._tf_dte_cl_line_infos(), adjustments)
+        rows = [(adj.label or self.env._('Descuento global'), adj.amount) for adj in adjustments]
         if totals['net']:
             rows.append((self.env._('Monto neto'), totals['net']))
         if totals['exempt']:

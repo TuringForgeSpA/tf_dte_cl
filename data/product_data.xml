@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta real: data/product_data.xml -->
+<odoo>
+    <record id="product_global_discount" model="product.product">
+        <field name="name">Descuento global</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0</field>
+        <field name="tf_dte_cl_global_adjustment" eval="True"/>
+        <field name="description_sale">Descuento global del documento. Use un precio negativo; con IVA
+            descuenta del monto afecto y sin impuestos, del exento.</field>
+    </record>
+</odoo>

@@ -3,6 +3,7 @@
 
 Ruta real: tests/test_invoice.py
 """
+from odoo import Command
 from odoo.exceptions import UserError
 from odoo.tests import tagged
 
@@ -40,6 +41,41 @@ class TestInvoice(TfDteClCommon):
         item = document['Detalle'][0]
         self.assertEqual((item['QtyItem'], item['PrcItem'], item['MontoItem']), (2, 10000, 20000))
         self.assertEqual(item['Impuesto'], [{'CodImp': 14, 'TasaImp': 19.0}])
+
+    def test_global_discount(self):
+        discount = self.env.ref('tf_dte_cl.product_global_discount')
+        discount.taxes_id = self.tax_iva
+        move = self.create_invoice(quantity=1, price=8803)
+        move.write({'invoice_line_ids': [Command.create({
+            'product_id': discount.id, 'name': 'Descuento por volumen', 'quantity': 1,
+            'price_unit': -2201, 'tax_ids': [Command.set(self.tax_iva.ids)],
+        })]})
+        with self.fake_sii() as fake:
+            move.action_post()
+        self.assertEqual(move.tf_dte_cl_state, 'signed')
+        self.assertEqual(move.amount_total, 7856)                 # IVA sobre el neto descontado
+        document = fake.last_sign_payload['Documento'][0]['documentos'][0]
+        self.assertEqual(len(document['Detalle']), 1)             # el descuento no va al detalle
+        self.assertEqual([(d['TpoMov'], d['ValorDR']) for d in document['DscRcgGlobal']], [('D', 2201)])
+        self.assertEqual((document['MntNeto'], document['MntIVA'], document['MntTotal']), (6602, 1254, 7856))
+        html = self.env['ir.actions.report']._render_qweb_html('account.report_invoice', move.ids)[0]
+        html = html.decode() if isinstance(html, bytes) else html
+        self.assertIn('Descuento por volumen', html)
+
+    def test_global_discount_blocked_with_additional_tax(self):
+        wine = self.env['account.tax'].create({
+            'name': 'ILA vinos (prueba)', 'amount': 20.5, 'amount_type': 'percent', 'type_tax_use': 'sale',
+            'tf_dte_cl_sii_code': '25', 'tax_group_id': self.tax_group_iva.id,
+            'company_id': self.company.id, 'country_id': self.chile.id,
+        })
+        discount = self.env.ref('tf_dte_cl.product_global_discount')
+        move = self.create_invoice(quantity=1, price=10000, taxes=self.tax_iva | wine)
+        move.write({'invoice_line_ids': [Command.create({
+            'product_id': discount.id, 'quantity': 1, 'price_unit': -1000,
+            'tax_ids': [Command.set(self.tax_iva.ids)],
+        })]})
+        with self.fake_sii(), self.assertUserError('impuestos adicionales'):
+            move.action_post()
 
     def test_amount_mismatch_blocks_and_returns_folio(self):
         with self.fake_sii() as fake:
@@ -153,6 +189,7 @@ class TestInvoice(TfDteClCommon):
         self.assertIn('S.I.I. - SANTIAGO CENTRO', html)
         self.assertIn('CEDIBLE', html)                               # la factura lleva copia cedible
         self.assertIn('Timbre Electrónico SII', html)
+        self.assertEqual(html.count('<!DOCTYPE html>'), 1)          # un solo contenedor HTML
 
     def test_credit_note_report_has_no_cedible_copy(self):
         with self.fake_sii():

@@ -15,7 +15,18 @@ from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 from .account_edi_format import DTE_CODE, SUCCESS_STATES
-from .dte_lines import LineInfo, build_detail, iva_rate, line_errors, split_amounts, IVA_CODE
+from .dte_lines import (
+    GlobalAdjustment,
+    LineInfo,
+    IVA_CODE,
+    adjustment_errors,
+    build_detail,
+    build_global_adjustments,
+    iva_rate,
+    line_errors,
+    round_half_up,
+    split_amounts,
+)
 from .reference import CODE_CANCEL, CODE_FIX_AMOUNTS
 
 SALE_MOVE_TYPES = ('out_invoice', 'out_refund')
@@ -65,7 +76,22 @@ class AccountMove(models.Model):
         return self.tf_dte_cl_reference_ids
 
     def _tf_dte_cl_product_lines(self):
-        return self.invoice_line_ids.filtered(lambda line: line.display_type == 'product')
+        """Líneas de detalle: excluye las de descuento o recargo global."""
+        return self.invoice_line_ids.filtered(
+            lambda line: line.display_type == 'product' and not line.product_id.tf_dte_cl_global_adjustment
+        )
+
+    def _tf_dte_cl_adjustment_lines(self):
+        return self.invoice_line_ids.filtered(
+            lambda line: line.display_type == 'product' and line.product_id.tf_dte_cl_global_adjustment
+        )
+
+    def _tf_dte_cl_global_adjustments(self) -> list[GlobalAdjustment]:
+        return [GlobalAdjustment(
+            label=(line.name or line.product_id.name or '').split('\n')[0],
+            amount=round_half_up(line.price_subtotal),
+            taxes=[tax._tf_dte_cl_info() for tax in line.tax_ids],
+        ) for line in self._tf_dte_cl_adjustment_lines()]
 
     def _tf_dte_cl_line_infos(self) -> list[LineInfo]:
         infos = []
@@ -103,7 +129,9 @@ class AccountMove(models.Model):
             errors.append(_('el documento debe emitirse en la moneda de la compañía (CLP)'))
         if any(tax.amount_type == 'group' for tax in self._tf_dte_cl_product_lines().tax_ids):
             errors.append(_('los grupos de impuestos no están soportados en DTE; asigne los impuestos por separado'))
-        errors += line_errors(doc_type, self._tf_dte_cl_line_infos())
+        infos = self._tf_dte_cl_line_infos()
+        errors += line_errors(doc_type, infos)
+        errors += adjustment_errors(doc_type, self._tf_dte_cl_global_adjustments(), infos)
         return errors
 
     def _tf_dte_cl_document_values(self) -> dict:
@@ -119,11 +147,23 @@ class AccountMove(models.Model):
         rate = iva_rate(infos)
         if rate:
             values['TasaIVA'] = rate
+        adjustments = [adj for adj in self._tf_dte_cl_global_adjustments() if adj.amount]
+        if adjustments:
+            values['DscRcgGlobal'] = build_global_adjustments(adjustments)
+            if any(not adj.is_exempt for adj in adjustments):
+                # La librería restaría el descuento en pesos también del IVA: se informan
+                # neto, IVA y total calculados por Odoo (IVA sobre el neto ya descontado).
+                expected = self._tf_dte_cl_expected_amounts()
+                values.update({
+                    'MntNeto': round_half_up(expected['MntNeto']),
+                    'MntIVA': round_half_up(expected['MntIVA']),
+                    'MntTotal': round_half_up(expected['MntTotal']),
+                })
         return values
 
     def _tf_dte_cl_expected_amounts(self) -> dict:
         self.ensure_one()
-        net, exempt = split_amounts(self._tf_dte_cl_line_infos())
+        net, exempt = split_amounts(self._tf_dte_cl_line_infos(), self._tf_dte_cl_global_adjustments())
         by_code = defaultdict(float)
         for line in self.line_ids.filtered('tax_line_id'):
             by_code[line.tax_line_id.tf_dte_cl_sii_code] += line.balance

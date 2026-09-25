@@ -85,6 +85,17 @@ class TestPicking(TfDteClCommon):
         html = html.decode() if isinstance(html, bytes) else html
         self.assertIn('Guía de despacho electrónica', html.replace('GUÍA', 'Guía'))
         self.assertIn('CEDIBLE CON SU FACTURA', html)
+        self.assertEqual(html.count('<!DOCTYPE html>'), 1)
+
+    def test_thermal_guide_shows_dispatch_and_destination(self):
+        with self.fake_sii():
+            picking = self.create_picking()
+            picking.button_validate()
+        html = self.env['ir.actions.report']._render_qweb_html('tf_dte_cl.report_picking_dte_thermal', picking.ids)[0]
+        html = html.decode() if isinstance(html, bytes) else html
+        self.assertIn('Despacho: <span>Por cuenta del receptor</span>', html)
+        self.assertIn('Destino: <span>Av. Siempre Viva 742</span>', html)
+        self.assertEqual(html.count('<!DOCTYPE html>'), 1)          # un solo contenedor HTML
 
     def test_internal_transfer_has_no_cedible_copy(self):
         with self.fake_sii():

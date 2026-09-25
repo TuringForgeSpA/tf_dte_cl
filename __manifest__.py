@@ -2,7 +2,7 @@
 {
     'name': 'Facturación electrónica SII Chile - Núcleo B2B',
     'summary': 'Emisión de DTE B2B (facturas 33/34, notas 56/61 y guías 52) ante el SII.',
-    'version': '18.0.2.6.2',
+    'version': '18.0.2.7.0',
     'description': 'Emisión de DTE B2B ante el SII de Chile. Ver README.md para la documentación completa.',
     'category': 'Accounting/Localizations/EDI',
     'license': 'LGPL-3',
@@ -26,6 +26,7 @@
         'data/tf_dte_cl.document_type.csv',
         'data/tf_dte_cl_activity_data.xml',
         'data/tf_dte_cl_cron.xml',
+        'data/product_data.xml',
         # Catálogos y certificado antes que los ajustes (sus acciones se usan ahí).
         'views/catalog_views.xml',
         'views/certificate_views.xml',
@@ -34,6 +35,7 @@
         'views/res_partner_views.xml',
         'views/res_config_settings_views.xml',
         'views/account_tax_views.xml',
+        'views/product_template_views.xml',
         'views/account_journal_views.xml',
         'views/account_move_views.xml',
         'views/stock_picking_views.xml',
