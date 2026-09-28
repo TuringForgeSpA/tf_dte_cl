@@ -34,9 +34,15 @@ class TestCaf(TfDteClCommon):
             self.create_caf('56', 10, 30)
 
     def test_overlap_allowed_between_environments(self):
-        certification = self.create_caf('56', 1, 20, idk='100')
-        production = self.create_caf('56', 5, 15, idk='300')
+        # Caso real: el CAF de certificación y el de producción empiezan en el mismo folio.
+        certification = self.create_caf('56', 1, 100, idk='100')
+        production = self.create_caf('56', 1, 4, idk='300')
         self.assertEqual((certification.environment, production.environment), ('certificacion', 'produccion'))
+
+    def test_same_caf_twice_is_rejected(self):
+        self.create_caf('56', 1, 20)
+        with self.assertRaises(Exception):
+            self.create_caf('56', 1, 20)
 
     def test_take_folio_sequence(self):
         Caf = self.env['tf_dte_cl.caf']

@@ -4,7 +4,7 @@ Módulo técnico para Odoo 18 que emite documentos tributarios electrónicos (DT
 ante el Servicio de Impuestos Internos (SII) de Chile usando la librería
 [`facturacion_electronica`](https://gitlab.com/dansanti/facturacion_electronica) 0.24.0.
 
-Versión 18.0.2.7.0. Es independiente de la localización oficial de Odoo
+Versión 18.0.2.7.2. Es independiente de la localización oficial de Odoo
 (`l10n_cl`, `l10n_latam_base`, `l10n_latam_invoice_document`).
 
 ## Alcance

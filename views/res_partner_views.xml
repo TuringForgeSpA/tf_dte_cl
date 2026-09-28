@@ -18,7 +18,10 @@
                 <field name="tf_dte_cl_comuna_id" class="o_address_city" placeholder="Comuna"
                        options="{'no_open': True, 'no_create': True}"/>
             </xpath>
-            <xpath expr="/form/sheet/group//field[@name='vat']" position="after">
+            <!-- Después del RUT como elemento del grupo: el propio campo, o su contenedor si otro
+                 módulo lo envuelve (base_vat usa <div name="vat_vies_container">). Dentro de un
+                 contenedor, Odoo no dibuja las etiquetas de los campos. -->
+            <xpath expr="/form/sheet/group//field[@name='vat']/ancestor-or-self::*[parent::group][1]" position="after">
                 <field name="tf_dte_cl_giro" placeholder="Giro comercial" readonly="parent_id"/>
                 <field name="tf_dte_cl_dte_email" widget="email" readonly="parent_id"/>
             </xpath>

@@ -180,8 +180,9 @@ class TfDteClCaf(models.Model):
     )
     void_ids = fields.One2many('tf_dte_cl.caf.void', 'caf_id', string='Folios por anular')
 
+    # Los rangos de certificación y producción son independientes: ambos pueden empezar en el folio 1.
     _sql_constraints = [
-        ('company_type_from_uniq', 'unique(company_id, document_type, folio_from)',
+        ('company_type_from_uniq', 'unique(company_id, document_type, environment, folio_from)',
          'Este CAF ya está cargado en la compañía.'),
     ]
 
