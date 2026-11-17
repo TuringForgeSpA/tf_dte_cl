@@ -15,7 +15,9 @@ class AccountTax(models.Model):
     tf_dte_cl_sii_code = fields.Selection(
         SII_TAX_SELECTION, string='Código SII',
         help='Código con el que se informa el impuesto en el DTE. Los impuestos de venta usados en '
-             'documentos electrónicos deben tenerlo; los precios se informan netos.',
+             'documentos electrónicos deben tenerlo; los precios se informan netos. Solo el IVA (14) '
+             'puede estar incluido en el precio, y únicamente lo admiten los documentos con montos '
+             'brutos (boletas).',
     )
 
     def _tf_dte_cl_info(self) -> TaxInfo:
@@ -30,10 +32,13 @@ class AccountTax(models.Model):
             type_tax_use=self.type_tax_use,
         )
 
-    @api.constrains('tf_dte_cl_sii_code', 'amount', 'amount_type', 'type_tax_use', 'include_base_amount')
+    @api.constrains('tf_dte_cl_sii_code', 'amount', 'amount_type', 'type_tax_use', 'include_base_amount',
+                    'price_include_override')
     def _check_tf_dte_cl_sii_code(self):
         for tax in self.filtered('tf_dte_cl_sii_code'):
-            errors = tax_config_errors(tax._tf_dte_cl_info())
+            # El IVA incluido en el precio se admite en el impuesto; cada documento
+            # decide al emitir si acepta montos brutos (dte_lines.line_errors).
+            errors = tax_config_errors(tax._tf_dte_cl_info(), allow_price_include=True)
             if errors:
                 raise ValidationError(self.env._(
                     'El impuesto "%(tax)s" no es válido para el SII: %(errors)s.',

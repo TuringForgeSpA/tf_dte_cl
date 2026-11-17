@@ -4,7 +4,7 @@ Módulo técnico para Odoo 18 que emite documentos tributarios electrónicos (DT
 ante el Servicio de Impuestos Internos (SII) de Chile usando la librería
 [`facturacion_electronica`](https://gitlab.com/dansanti/facturacion_electronica) 0.24.0.
 
-Versión 18.0.2.7.2. Es independiente de la localización oficial de Odoo
+Versión 18.0.2.8.0. Es independiente de la localización oficial de Odoo
 (`l10n_cl`, `l10n_latam_base`, `l10n_latam_invoice_document`).
 
 ## Alcance
@@ -17,7 +17,8 @@ Versión 18.0.2.7.2. Es independiente de la localización oficial de Odoo
 | Nota de crédito electrónica | 61 | `account.move` |
 | Guía de despacho electrónica | 52 | `stock.picking` |
 
-Fuera de alcance: boletas (39/41), punto de venta, factura de compra (46),
+Fuera de alcance de este núcleo: boletas (39/41, en el módulo complementario
+`tf_dte_cl_boleta`), punto de venta, factura de compra (46),
 liquidación-factura (43), exportación (110/111/112), RCOF, libros y cesión.
 El intercambio de DTE con el receptor está planificado para una segunda fase.
 
@@ -138,6 +139,24 @@ Se cargan al instalar o actualizar, solo con los registros que falten:
 
 En Odoo 18 el cron de `account_edi` viene inactivo; por eso el módulo tiene su
 propio cron de envío y mantiene sincronizado el documento EDI.
+
+## Puntos de extensión
+
+Los módulos complementarios (por ejemplo `tf_dte_cl_boleta`) amplían el núcleo
+sin modificarlo:
+
+| Método | Por defecto | Uso |
+|---|---|---|
+| `tf_dte_cl.sii.client._tf_dte_cl_supported_dte_types()` | 33, 34, 52, 56, 61 | Tipos que acepta el cliente SII |
+| `_tf_dte_cl_api_payload()` (mixin) | `{}` | `{'api': True}` envía y consulta por la API REST del SII; el cliente interpreta sus respuestas JSON |
+| `_tf_dte_cl_receiver_errors()` / `_tf_dte_cl_receiver_rut()` (mixin) | Receptor B2B | Reglas de receptor propias (p. ej. consumidor anónimo) |
+| `account.move._tf_dte_cl_invoice_document_types()` | 33, 34, 56 | Tipos que se emiten como factura de cliente |
+| `account.move._tf_dte_cl_allows_price_include()` | `False` | Documentos con montos brutos (IVA incluido) |
+| `tf_dte_cl.reference._tf_dte_cl_cancellable_types()` | Facturas y ND | Tipos que una NC puede anular |
+
+Los tipos nuevos se agregan con `selection_add` en los campos de tipo DTE (mixin,
+diario, CAF y sobre). Un impuesto IVA (14) puede guardarse con el precio incluido,
+pero el núcleo lo rechaza al emitir facturas y notas.
 
 ## Descuentos y recargos globales
 

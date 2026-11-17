@@ -185,6 +185,26 @@ class TfDteClDocumentMixin(models.AbstractModel):
         raise NotImplementedError
 
     # ------------------------------------------------------------------
+    # Puntos de extensión con comportamiento por defecto (núcleo B2B)
+    # ------------------------------------------------------------------
+    def _tf_dte_cl_api_payload(self) -> dict:
+        """Claves extra para enviar y consultar el documento.
+
+        ``{'api': True}`` usa los servicios REST del SII en lugar de los SOAP.
+        """
+        return {}
+
+    def _tf_dte_cl_receiver_errors(self) -> list[str]:
+        """Errores de los datos del receptor (por defecto, los de un receptor B2B)."""
+        self.ensure_one()
+        return self._tf_dte_cl_get_receiver()._tf_dte_cl_receiver_errors()
+
+    def _tf_dte_cl_receiver_rut(self) -> str | bool:
+        """RUT del receptor tal como se informa en el DTE."""
+        self.ensure_one()
+        return normalize_rut(self._tf_dte_cl_get_receiver().commercial_partner_id.vat)
+
+    # ------------------------------------------------------------------
     # Utilidades
     # ------------------------------------------------------------------
     def _tf_dte_cl_client(self):
@@ -250,7 +270,7 @@ class TfDteClDocumentMixin(models.AbstractModel):
         else:
             errors += [
                 _('cliente "%(name)s": %(error)s', name=receiver.display_name, error=error)
-                for error in receiver._tf_dte_cl_receiver_errors()
+                for error in self._tf_dte_cl_receiver_errors()
             ]
         emission = self._tf_dte_cl_get_emission_date()
         if not emission or not DATE_MIN <= emission <= DATE_MAX:
@@ -341,7 +361,6 @@ class TfDteClDocumentMixin(models.AbstractModel):
                 raise UserError(self.env._('Error al firmar %(doc)s: %(msg)s', doc=self._tf_dte_cl_label(),
                                            msg=result.message))
             self._tf_dte_cl_check_amounts(result.amounts)
-            receiver = self._tf_dte_cl_get_receiver().commercial_partner_id
             self.write({
                 'tf_dte_cl_xml_file': base64.b64encode(
                     result.xml.encode('ISO-8859-1', errors='xmlcharrefreplace')
@@ -351,7 +370,7 @@ class TfDteClDocumentMixin(models.AbstractModel):
                 'tf_dte_cl_barcode': result.barcode_png_b64 or False,
                 'tf_dte_cl_signed_date': fields.Datetime.now(),
                 'tf_dte_cl_emission_date': self._tf_dte_cl_get_emission_date(),
-                'tf_dte_cl_receiver_rut': normalize_rut(receiver.vat),
+                'tf_dte_cl_receiver_rut': self._tf_dte_cl_receiver_rut(),
                 'tf_dte_cl_total_amount': round_half_up(result.amounts.get('MntTotal') or 0),
                 'tf_dte_cl_state': 'signed',
                 'tf_dte_cl_error': False,
@@ -434,6 +453,7 @@ class TfDteClDocumentMixin(models.AbstractModel):
             ID=envelope.name,
             filename=envelope.xml_filename,
             sii_xml_request=envelope._tf_dte_cl_xml_text(),
+            **self._tf_dte_cl_api_payload(),
         )
         envelope._tf_dte_cl_register_attempt()
         result = self._tf_dte_cl_client().tf_dte_cl_send_envelope(payload)
@@ -460,7 +480,7 @@ class TfDteClDocumentMixin(models.AbstractModel):
                 'Receptor': {'RUTRecep': self.tf_dte_cl_receiver_rut},
                 'MntTotal': self.tf_dte_cl_total_amount,
             }],
-        }])
+        }], **self._tf_dte_cl_api_payload())
 
     def _tf_dte_cl_resolve_unknown(self) -> str:
         self.ensure_one()
@@ -508,7 +528,8 @@ class TfDteClDocumentMixin(models.AbstractModel):
         vals = {'tf_dte_cl_last_query': fields.Datetime.now()}
         if envelope.track_id:
             result = client.tf_dte_cl_query_upload(dict(self._tf_dte_cl_base_payload(),
-                                                        codigo_envio=envelope.track_id))
+                                                        codigo_envio=envelope.track_id,
+                                                        **self._tf_dte_cl_api_payload()))
             new_state = state_from_upload(result.state) if result.ok else None
         else:
             result = client.tf_dte_cl_query_document(self._tf_dte_cl_query_document_payload())
@@ -542,7 +563,10 @@ class TfDteClDocumentMixin(models.AbstractModel):
     # ------------------------------------------------------------------
     def _tf_dte_cl_document_name(self) -> str:
         self.ensure_one()
-        label = dict(DTE_TYPES).get(self.tf_dte_cl_document_type or self._tf_dte_cl_get_document_type(), '')
+        # Se lee la selección del campo (no la constante) para incluir los tipos que
+        # agregan los módulos complementarios con selection_add.
+        selection = dict(self._fields['tf_dte_cl_document_type']._description_selection(self.env))
+        label = selection.get(self.tf_dte_cl_document_type or self._tf_dte_cl_get_document_type(), '')
         return label.rsplit(' (', 1)[0]
 
     @api.model

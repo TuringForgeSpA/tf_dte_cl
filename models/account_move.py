@@ -123,16 +123,24 @@ class AccountMove(models.Model):
         doc_type = self._tf_dte_cl_get_document_type()
         if self.move_type == 'out_refund' and doc_type != CREDIT_NOTE_DTE_TYPE:
             errors.append(_('una nota de crédito debe emitirse en un diario de notas de crédito (61)'))
-        if self.move_type == 'out_invoice' and doc_type not in INVOICE_DTE_TYPES:
+        if self.move_type == 'out_invoice' and doc_type not in self._tf_dte_cl_invoice_document_types():
             errors.append(_('una factura o nota de débito no puede emitirse en un diario de notas de crédito'))
         if self.currency_id != self.company_id.currency_id:
             errors.append(_('el documento debe emitirse en la moneda de la compañía (CLP)'))
         if any(tax.amount_type == 'group' for tax in self._tf_dte_cl_product_lines().tax_ids):
             errors.append(_('los grupos de impuestos no están soportados en DTE; asigne los impuestos por separado'))
         infos = self._tf_dte_cl_line_infos()
-        errors += line_errors(doc_type, infos)
+        errors += line_errors(doc_type, infos, allow_price_include=self._tf_dte_cl_allows_price_include())
         errors += adjustment_errors(doc_type, self._tf_dte_cl_global_adjustments(), infos)
         return errors
+
+    def _tf_dte_cl_invoice_document_types(self) -> tuple:
+        """Tipos DTE que se emiten como factura de cliente (out_invoice)."""
+        return INVOICE_DTE_TYPES
+
+    def _tf_dte_cl_allows_price_include(self) -> bool:
+        """Si el documento informa montos brutos (IVA incluido en el precio). Núcleo B2B: no."""
+        return False
 
     def _tf_dte_cl_document_values(self) -> dict:
         self.ensure_one()
@@ -221,7 +229,9 @@ class AccountMove(models.Model):
     def _reverse_moves(self, default_values_list=None, cancel=False):
         """Nota de crédito desde un DTE aceptado: diario 61 y referencia al documento original."""
         default_values_list = list(default_values_list or [{} for _move in self])
-        doc_types = self.env['tf_dte_cl.document_type']
+        # Sin filtro de activos: el tipo del documento original debe encontrarse aunque esté
+        # archivado en el catálogo (p. ej. boletas, que activa un módulo complementario).
+        doc_types = self.env['tf_dte_cl.document_type'].with_context(active_test=False)
         for move, default_values in zip(self, default_values_list):
             if move.tf_dte_cl_state not in ('accepted', 'accepted_objections'):
                 continue

@@ -11,7 +11,9 @@ Fuentes:
   toma de ``TasaIVA``; una línea con tasa 0 debe llevar ``IndExe``.
 
 Criterio tf_dte_cl: los precios se envían netos. Un impuesto con código SII no
-puede estar incluido en el precio.
+puede estar incluido en el precio, salvo en los documentos que lo admiten
+expresamente (``allow_price_include``): las boletas y sus notas, que informan
+montos brutos (formato de boletas, campo MontoItem).
 """
 from __future__ import annotations
 
@@ -81,8 +83,11 @@ def round_half_up(value) -> int:
     return int(Decimal(str(value)).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
 
 
-def tax_config_errors(tax: TaxInfo) -> list[str]:
-    """Errores de configuración de un impuesto con código SII."""
+def tax_config_errors(tax: TaxInfo, allow_price_include: bool = False) -> list[str]:
+    """Errores de configuración de un impuesto con código SII.
+
+    ``allow_price_include`` admite el IVA incluido en el precio (montos brutos).
+    """
     if not tax.code:
         return []
     errors = []
@@ -92,7 +97,7 @@ def tax_config_errors(tax: TaxInfo) -> list[str]:
         errors.append('debe ser un impuesto de ventas')
     if tax.amount_type != 'percent':
         errors.append('debe ser un impuesto porcentual')
-    if tax.price_include:
+    if tax.price_include and not (allow_price_include and tax.code == IVA_CODE):
         errors.append('no puede estar incluido en el precio')
     if tax.include_base_amount:
         errors.append('no puede afectar la base de otros impuestos')
@@ -102,7 +107,7 @@ def tax_config_errors(tax: TaxInfo) -> list[str]:
     return errors
 
 
-def line_errors(doc_type: str, lines: list[LineInfo]) -> list[str]:
+def line_errors(doc_type: str, lines: list[LineInfo], allow_price_include: bool = False) -> list[str]:
     """Errores de las líneas de detalle para un tipo de DTE."""
     errors = []
     if not lines:
@@ -121,7 +126,8 @@ def line_errors(doc_type: str, lines: list[LineInfo]) -> list[str]:
             if not tax.code:
                 errors.append(prefix + 'el impuesto "%s" no tiene código SII' % tax.name)
                 continue
-            errors += [prefix + 'impuesto "%s": %s' % (tax.name, error) for error in tax_config_errors(tax)]
+            errors += [prefix + 'impuesto "%s": %s' % (tax.name, error)
+                       for error in tax_config_errors(tax, allow_price_include)]
         if len(line.iva) > 1:
             errors.append(prefix + 'tiene más de un IVA')
         if len(line.additional) > 1:
@@ -172,7 +178,13 @@ def build_detail(lines: list[LineInfo]) -> list[OrderedDict]:
         item['MontoItem'] = amount
         if not line.is_exempt:
             ordered = line.iva + line.additional
-            item['Impuesto'] = [{'CodImp': int(tax.code), 'TasaImp': tax.rate} for tax in ordered]
+            item['Impuesto'] = []
+            for tax in ordered:
+                tax_item = {'CodImp': int(tax.code), 'TasaImp': tax.rate}
+                if tax.price_include:
+                    # La librería calcula la base dividiendo el monto bruto por (1 + tasa).
+                    tax_item['price_include'] = True
+                item['Impuesto'].append(tax_item)
         detail.append(item)
     return detail
 

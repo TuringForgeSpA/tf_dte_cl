@@ -232,7 +232,9 @@ class TfDteClCaf(models.Model):
             data = parse_caf(base64.b64decode(caf_file or b''))
         except CafError as error:
             raise UserError(str(error)) from None
-        if data['document_type'] not in DTE_TYPE_CODES:
+        # La selección del campo incluye los tipos que agregan los módulos complementarios.
+        supported = dict(self._fields['document_type']._description_selection(self.env))
+        if data['document_type'] not in supported:
             raise UserError(self.env._(
                 'El CAF es para el tipo de documento %s, que no está dentro del alcance de este módulo.',
                 data['document_type'],

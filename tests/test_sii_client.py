@@ -126,8 +126,9 @@ class TestSiiClient(TransactionCase):
         self.assertEqual(ok.amounts['MntTotal'], 119)
         self.assertFalse(bad.ok)
         self.assertEqual(bad.message, 'Debe ir IVA')                        # sin el traceback
+        # Un tipo fuera de alcance (exportación) se rechaza antes de llegar a la librería.
         with self.assertRaises(UserError):
-            self.client.tf_dte_cl_sign(base(Documento=[{'TipoDTE': 39, 'documentos': [{'Folio': 1}]}]))
+            self.client.tf_dte_cl_sign(base(Documento=[{'TipoDTE': 110, 'documentos': [{'Folio': 1}]}]))
         payload = base(Documento=doc())
         payload['Emisor']['Modo'] = 'pruebas'
         with self.assertRaises(UserError):
@@ -194,3 +195,63 @@ class TestSiiClient(TransactionCase):
         with patch.object(sc.fe, 'consulta_estado_dte', return_value={
                 'T33F10': {'status': 'Enviado', 'xml_resp': '', 'errores': ['x']}}):
             self.assertFalse(self.client.tf_dte_cl_query_document(payload).ok)
+
+
+@tagged('post_install', '-at_install', 'tf_dte_cl')
+class TestSiiClientApi(TransactionCase):
+    """Respuestas JSON de la API REST del SII (``api=True``), sin red."""
+
+    def test_classify_send(self):
+        ok = sc.classify_api_send_response({'sii_xml_response': b'{}', 'sii_send_ident': 1014, 'estado_sii': 'REC'})
+        self.assertEqual((ok.outcome, ok.track_id), (sc.SEND_OK, '1014'))
+        http = sc.classify_api_send_response({'status': 'NoEnviado', 'sii_xml_response': b'', 'estado_sii': 503,
+                                              'xml_resp': 'SII POST respondió HTTP 503'})
+        self.assertEqual(http.outcome, sc.SEND_RETRY)
+        bad = sc.classify_api_send_response({'status': 'NoEnviado', 'sii_xml_response': b'', 'estado_sii': 400,
+                                             'xml_resp': 'SII POST respondió HTTP 400'})
+        self.assertEqual(bad.outcome, sc.SEND_FAILED)
+        gateway = sc.classify_api_send_response({'status': 'NoEnviado', 'sii_xml_response': b'', 'estado_sii': 502,
+                                                 'xml_resp': 'SII POST respondió HTTP 502'})
+        self.assertEqual(gateway.outcome, sc.SEND_UNKNOWN)          # pudo llegar: se consulta antes
+        lost = sc.classify_api_send_response({'status': 'NoEnviado', 'xml_resp': 'timeout'})
+        self.assertEqual(lost.outcome, sc.SEND_UNKNOWN)
+        self.assertEqual(sc.classify_api_send_response('').outcome, sc.SEND_UNKNOWN)
+
+    def test_interpret_upload(self):
+        accepted = {'estado': 'EPR', 'estadistica': [{'tipo': 39, 'informados': 1, 'aceptados': 1,
+                                                      'rechazados': 0, 'reparos': 0}]}
+        self.assertEqual(sc.interpret_api_upload(accepted)[1], sc.UPLOAD_STATE_ACCEPTED)
+        rejected = {'estado': 'EPR', 'estadistica': [{'tipo': 39, 'informados': 1, 'aceptados': 0,
+                                                      'rechazados': 1, 'reparos': 0}],
+                    'detalle_rep_rech': [{'tipo': 39, 'folio': 7, 'estado': 'RCH',
+                                          'error': [{'codigo': 'X1', 'descripcion': 'Error de prueba'}]}]}
+        self.assertEqual(sc.interpret_api_upload(rejected)[1], sc.UPLOAD_STATE_REJECTED)
+        self.assertIn('T39F7', sc._api_detail(rejected))
+        self.assertIsNone(sc.interpret_api_upload({'estado': 'REC'})[1])
+        self.assertEqual(sc.interpret_api_upload({'estado': 'RPR'})[1], sc.UPLOAD_STATE_OBJECTIONS)
+        self.assertEqual(sc.interpret_api_upload({'estado': 'RCT'})[1], sc.UPLOAD_STATE_REJECTED)
+        self.assertEqual(sc.parse_api_json('no es json'), {})
+
+    def test_query_paths(self):
+        client = self.env['tf_dte_cl.sii.client']
+        payload = {
+            'Emisor': {'RUTEmisor': '76000000-0', 'Modo': 'certificacion'},
+            'firma_electronica': {'priv_key': 'K', 'cert': 'C', 'rut_firmante': '11111111-1'},
+            'api': True,
+        }
+        upload = {'status': 'Aceptado', 'xml_resp': '{"estado": "EPR", "estadistica": '
+                  '[{"tipo": 39, "informados": 1, "aceptados": 1, "rechazados": 0, "reparos": 0}]}'}
+        with patch.object(sc, 'fe') as fe:
+            fe.consulta_estado_envio.return_value = upload
+            result = client.tf_dte_cl_query_upload(dict(payload, codigo_envio='1014'))
+            self.assertTrue(fe.consulta_estado_envio.call_args[0][0]['api'])
+        self.assertEqual((result.ok, result.state), (True, sc.UPLOAD_STATE_ACCEPTED))
+        document = dict(payload, Documento=[{'TipoDTE': 33, 'documentos': [{
+            'Folio': 1, 'FchEmis': datetime.date(2026, 11, 11), 'Receptor': {'RUTRecep': '66666666-6'}, 'MntTotal': 1000,
+        }]}])
+        with patch.object(sc, 'fe') as fe:
+            fe.consulta_estado_dte.return_value = {'T33F1': {
+                'glosa': 'Documento Recibido', 'status': 'Proceso',
+                'xml_resp': '{"codigo": "DOK", "descripcion": "Documento Recibido por el SII"}'}}
+            result = client.tf_dte_cl_query_document(document)
+        self.assertEqual((result.ok, result.code, result.received), (True, 'DOK', True))

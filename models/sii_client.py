@@ -19,6 +19,7 @@ Debe ser el primer import de ``models/__init__.py``.
 from __future__ import annotations
 
 import codecs
+import json
 import logging
 import re
 import ssl
@@ -37,7 +38,8 @@ _logger = logging.getLogger(__name__)
 LIB_VERSION = '0.24.0'
 
 # Alcance del núcleo B2B: cualquier otro TipoDTE (boletas, exportación, 46, 43)
-# se rechaza antes de llegar a la librería.
+# se rechaza antes de llegar a la librería. Un módulo complementario puede ampliar
+# el conjunto con ``_tf_dte_cl_supported_dte_types`` (p. ej. tf_dte_cl_boleta).
 SUPPORTED_DTE_TYPES = frozenset({33, 34, 52, 56, 61})
 SII_ENVIRONMENTS = frozenset({'certificacion', 'produccion'})
 
@@ -335,6 +337,117 @@ def document_was_received(code: str | None) -> bool | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Servicios REST del SII (payload con ``api=True``)
+# La librería usa la API REST para las boletas (39/41): Track ID, estado del
+# envío y estado del documento llegan como JSON, no como XML SOAP. Los nombres
+# de campos son los que lee la librería (conexion.py): ``trackid``, ``estado``,
+# ``estadistica``, ``detalle_rep_rech``, ``codigo`` y ``descripcion``.
+# ---------------------------------------------------------------------------
+API_PENDING_UPLOAD_CODES = frozenset({'REC', 'PRD'})   # recibido / en proceso
+# RPR: aceptado con reparos (la librería lo trata como aceptado, clase_util.estado_envio).
+API_OBJECTIONS_UPLOAD_CODE = 'RPR'
+# HTTP del envío REST: el sobre no se recibió y no tiene sentido reenviarlo igual
+# (formato o firma); se vuelve a firmar con el mismo folio, como STATUS 7/8 en SOAP.
+API_HTTP_FAILED = frozenset({400, 413, 415, 422})
+# Respuestas transitorias: el SII no procesó la carga; se reintenta el mismo sobre.
+API_HTTP_RETRY = frozenset({401, 403, 408, 429, 503})
+
+
+def parse_api_json(raw) -> dict:
+    """JSON de la API REST del SII como dict; ``{}`` si no es un objeto JSON válido."""
+    if isinstance(raw, bytes):
+        raw = raw.decode('ISO-8859-1', 'replace')
+    if not isinstance(raw, str) or not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def classify_api_send_response(resp) -> SendResult:
+    """Clasifica la respuesta de ``fe.enviar_xml`` cuando el envío fue por la API REST."""
+    if isinstance(resp, str):
+        return classify_send_response(resp)
+    if not isinstance(resp, dict) or not resp:
+        return SendResult(SEND_UNKNOWN, message='Respuesta vacía de la librería al enviar.')
+    if resp.get('sii_send_ident'):
+        return SendResult(SEND_OK, track_id=str(resp['sii_send_ident']).strip(),
+                          upload_status=str(resp.get('estado_sii') or ''))
+    if 'sii_xml_response' not in resp:
+        return SendResult(
+            SEND_UNKNOWN,
+            message='Error de comunicación al enviar al SII: %s' % short_message(resp.get('xml_resp')),
+        )
+    status = resp.get('estado_sii')
+    message = short_message(resp.get('xml_resp')) or 'El SII no aceptó la carga (%s).' % (status or 'sin Track ID')
+    if isinstance(status, int):
+        if status in API_HTTP_FAILED:
+            return SendResult(SEND_FAILED, upload_status=str(status), message=message)
+        if status >= 500 and status not in API_HTTP_RETRY:
+            # Un error del servidor puede ocurrir después de recibir el sobre: se consulta
+            # antes de reenviar, para no repetir el folio.
+            return SendResult(SEND_UNKNOWN, upload_status=str(status), message=message)
+    # Respuesta transitoria o JSON sin Track ID: se reintenta el mismo sobre.
+    return SendResult(SEND_RETRY, upload_status=str(status or ''), message=message)
+
+
+def _api_counter(entries, name: str) -> int:
+    """Suma un contador de ``estadistica`` (lista por tipo de documento o dict)."""
+    if isinstance(entries, dict):
+        entries = [entries]
+    total = 0
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        for key, value in entry.items():
+            if str(key).lower() == name:
+                try:
+                    total += int(value or 0)
+                except (TypeError, ValueError):
+                    pass
+    return total
+
+
+def _api_detail(data: dict) -> str:
+    """Glosas de rechazo o reparo de ``detalle_rep_rech`` (sin datos del documento)."""
+    parts = []
+    for item in data.get('detalle_rep_rech') or []:
+        if not isinstance(item, dict):
+            continue
+        errors = item.get('error') or []
+        if isinstance(errors, dict):
+            errors = [errors]
+        texts = [
+            ' '.join(filter(None, [str(err.get('codigo') or ''), err.get('descripcion'), err.get('detalle')]))
+            for err in errors if isinstance(err, dict)
+        ] or [item.get('descripcion') or item.get('estado')]
+        prefix = 'T%sF%s: ' % (item.get('tipo'), item.get('folio')) if item.get('folio') else ''
+        parts += [prefix + short_message(text) for text in texts if text]
+    return '; '.join(parts)
+
+
+def interpret_api_upload(data: dict) -> tuple[str | None, str | None, dict]:
+    """(código, estado definitivo o ``None``, contadores) de un envío consultado por la API REST."""
+    code = str(data.get('estado') or '').strip() or None
+    stats = data.get('estadistica')
+    counters = {key.upper(): str(_api_counter(stats, key)) for key in ('informados', 'aceptados',
+                                                                        'rechazados', 'reparos')}
+    if code in API_PENDING_UPLOAD_CODES:
+        return code, None, counters
+    if code == API_OBJECTIONS_UPLOAD_CODE:
+        return code, UPLOAD_STATE_OBJECTIONS, counters
+    values = dict(counters, ESTADO=code)
+    if code != UPLOAD_ACCEPTED_CODE or stats:
+        state = interpret_upload_values(values)
+        if state is None and code and code != UPLOAD_ACCEPTED_CODE:
+            _logger.warning('Estado de envío REST no reconocido: %s', code)
+        return code, state, counters
+    return code, None, counters
+
+
 def _glosa(values: dict) -> str:
     parts = [values.get(tag) for tag in ('GLOSA_ESTADO', 'GLOSA', 'DESC_ESTADO', 'GLOSA_ERR')]
     return ' - '.join(dict.fromkeys(filter(None, parts)))
@@ -354,6 +467,11 @@ class TfDteClSiiClient(models.AbstractModel):
     _description = 'Cliente SII (integración con facturacion_electronica)'
 
     # -- Validaciones previas ------------------------------------------------
+    @api.model
+    def _tf_dte_cl_supported_dte_types(self) -> frozenset:
+        """TipoDTE que este cliente acepta. Los módulos complementarios lo amplían."""
+        return SUPPORTED_DTE_TYPES
+
     @api.model
     def _tf_dte_cl_check_library(self):
         if fe is None:
@@ -378,8 +496,9 @@ class TfDteClSiiClient(models.AbstractModel):
         groups = payload.get('Documento') or []
         if not groups or not all(group.get('documentos') for group in groups):
             raise UserError(self.env._('No hay documentos para procesar.'))
+        supported = self._tf_dte_cl_supported_dte_types()
         for group in groups:
-            if group.get('TipoDTE') not in SUPPORTED_DTE_TYPES:
+            if group.get('TipoDTE') not in supported:
                 raise UserError(self.env._(
                     'El tipo de documento %s no está dentro del alcance de este módulo.',
                     group.get('TipoDTE'),
@@ -480,7 +599,10 @@ class TfDteClSiiClient(models.AbstractModel):
         except Exception as error:  # noqa: BLE001
             _logger.exception('facturacion_electronica.enviar_xml falló (sobre %s)', payload['ID'])
             return SendResult(SEND_UNKNOWN, message=short_message(error))
-        result = classify_send_response(resp)
+        if payload.get('api'):
+            result = classify_api_send_response(resp)
+        else:
+            result = classify_send_response(resp)
         _logger.info('Envío SII del sobre %s: %s %s', payload['ID'], result.outcome, result.track_id or '')
         return result
 
@@ -504,6 +626,14 @@ class TfDteClSiiClient(models.AbstractModel):
             return QueryResult(ok=False, detail=errors_to_text(resp['errores']))
         if resp.get('warning') and not resp.get('xml_resp'):
             return QueryResult(ok=False, detail=short_message(resp['warning'].get('message')))
+        if payload.get('api'):
+            raw = _raw_text(resp.get('xml_resp'))
+            data = parse_api_json(raw)
+            code, state, counters = interpret_api_upload(data)
+            if not code:
+                return QueryResult(ok=False, detail=self.env._('El SII no informó un estado.'), raw=raw)
+            return QueryResult(ok=True, code=code, state=state, counters=counters,
+                               detail=_api_detail(data), raw=raw)
         raw = _raw_text(resp.get('xml_resp'))
         values = parse_sii_xml(raw)
         code = values.get('ESTADO_ENVIO') or values.get('ESTADO')
@@ -541,6 +671,14 @@ class TfDteClSiiClient(models.AbstractModel):
         if item.get('errores'):
             return QueryResult(ok=False, detail=errors_to_text(item['errores']))
         raw = _raw_text(item.get('xml_resp'))
+        if payload.get('api'):
+            data = parse_api_json(raw)
+            code = str(data.get('codigo') or '').strip() or None
+            detail = short_message(data.get('descripcion') or item.get('glosa'))
+            if not code or code.startswith('-'):
+                return QueryResult(ok=False, code=code, detail=detail or self.env._('El SII no informó un estado.'),
+                                   raw=raw)
+            return QueryResult(ok=True, code=code, received=document_was_received(code), detail=detail, raw=raw)
         values = parse_sii_xml(raw)
         code = values.get('ESTADO')
         detail = _glosa(values) or item.get('glosa') or ''

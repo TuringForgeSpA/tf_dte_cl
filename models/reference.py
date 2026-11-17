@@ -57,11 +57,13 @@ CREDIT_NOTE_TYPES = ('60', '61')
 CANCELLABLE_BY_CREDIT_NOTE = ('30', '32', '33', '34', '45', '46', '55', '56')
 
 
-def validate_references(dte_type: str, lines: list[dict]) -> list[str]:
+def validate_references(dte_type: str, lines: list[dict],
+                        cancellable=CANCELLABLE_BY_CREDIT_NOTE) -> list[str]:
     """Valida las referencias de un DTE. No depende de Odoo.
 
     Cada línea es un dict con: ``type_code``, ``type_kind``, ``folio``,
     ``is_global``, ``date``, ``other_rut``, ``code``, ``reason``.
+    ``cancellable`` son los tipos que una nota de crédito puede anular.
     Devuelve la lista de errores (vacía si todo está bien).
     """
     errors = []
@@ -111,7 +113,7 @@ def validate_references(dte_type: str, lines: list[dict]) -> list[str]:
             continue
         if code in (CODE_CANCEL, CODE_FIX_TEXT) and line.get('is_global'):
             errors.append(prefix + 'una anulación o corrección de texto no puede ser una referencia global.')
-        if dte_type == '61' and code == CODE_CANCEL and type_code not in CANCELLABLE_BY_CREDIT_NOTE:
+        if dte_type == '61' and code == CODE_CANCEL and type_code not in cancellable:
             errors.append(prefix + 'una nota de crédito solo anula facturas o notas de débito.')
         if dte_type == '56' and code == CODE_CANCEL and type_code not in CREDIT_NOTE_TYPES:
             errors.append(prefix + 'una nota de débito solo anula notas de crédito.')
@@ -209,8 +211,14 @@ class TfDteClReference(models.Model):
             'reason': reference.reason,
         } for reference in self]
 
+    @api.model
+    def _tf_dte_cl_cancellable_types(self) -> tuple:
+        """Tipos de documento que una nota de crédito puede anular (CodRef 1)."""
+        return CANCELLABLE_BY_CREDIT_NOTE
+
     def _tf_dte_cl_errors(self, dte_type: str) -> list[str]:
-        return validate_references(dte_type, self._tf_dte_cl_line_values())
+        return validate_references(dte_type, self._tf_dte_cl_line_values(),
+                                   cancellable=self._tf_dte_cl_cancellable_types())
 
     def _tf_dte_cl_payload(self, dte_type: str) -> list[OrderedDict]:
         return build_references_payload(dte_type, self._tf_dte_cl_line_values())
